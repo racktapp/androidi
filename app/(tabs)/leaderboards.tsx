@@ -106,10 +106,10 @@ export default function LeaderboardsScreen() {
 
     setLoadingStats(true);
     try {
-      // Get ALL matches where current user participated
-      const { data: matchPlayers } = await supabase
+      const { data: playerRows } = await supabase
         .from('match_players')
         .select(`
+          user_id,
           match_id,
           team,
           match:match_id (
@@ -121,54 +121,48 @@ export default function LeaderboardsScreen() {
             sport
           )
         `)
-        .eq('user_id', userId);
+        .in('user_id', [userId, selectedOpponent]);
 
-      if (!matchPlayers) {
+      if (!playerRows || playerRows.length === 0) {
         setHeadToHeadStats(null);
         setLoadingStats(false);
         return;
       }
 
-      // Filter only confirmed matches with selected sport (no group filter)
-      const relevantMatches = matchPlayers
-        .filter((mp: any) => 
-          mp.match?.status === 'confirmed' &&
-          mp.match?.sport === selectedSport
-        )
-        .map((mp: any) => mp.match)
-        .filter((match: any, index: number, self: any[]) => 
-          self.findIndex((m: any) => m.id === match.id) === index
-        );
+      const matchesById = new Map<string, { match: any; myTeam?: string; opponentTeam?: string }>();
 
-      const matchesVsOpponent = await Promise.all(
-        relevantMatches.map(async (match: any) => {
-          const { data: opponentPlayer } = await supabase
-            .from('match_players')
-            .select('team')
-            .eq('match_id', match.id)
-            .eq('user_id', selectedOpponent)
-            .single();
+      for (const row of playerRows) {
+        const match = Array.isArray(row.match) ? row.match[0] : row.match;
 
-          if (!opponentPlayer) return null;
+        if (
+          !match ||
+          match.status !== 'confirmed' ||
+          match.sport !== selectedSport
+        ) {
+          continue;
+        }
 
-          const myTeam = matchPlayers.find((mp: any) => mp.match_id === match.id)?.team;
-          const opponentTeam = opponentPlayer.team;
+        const existing = matchesById.get(row.match_id) || { match };
 
-          if (!myTeam || !opponentTeam) return null;
+        if (row.user_id === userId) {
+          existing.myTeam = row.team;
+        }
 
-          const iWon = match.winner_team === myTeam;
-          const opponentWon = match.winner_team === opponentTeam;
+        if (row.user_id === selectedOpponent) {
+          existing.opponentTeam = row.team;
+        }
 
-          return {
-            matchId: match.id,
-            iWon,
-            opponentWon,
-            createdAt: match.created_at,
-          };
-        })
-      );
+        matchesById.set(row.match_id, existing);
+      }
 
-      const validMatches = matchesVsOpponent.filter(Boolean);
+      const validMatches = Array.from(matchesById.values())
+        .filter(({ myTeam, opponentTeam }) => Boolean(myTeam && opponentTeam))
+        .map(({ match, myTeam, opponentTeam }) => ({
+          matchId: match.id,
+          iWon: match.winner_team === myTeam,
+          opponentWon: match.winner_team === opponentTeam,
+          createdAt: match.created_at,
+        }));
 
       let filteredMatches = validMatches;
       if (period === 'monthly') {

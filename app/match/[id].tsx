@@ -207,11 +207,6 @@ export default function MatchDetailScreen() {
     });
     
     if (!player) {
-      console.log('[Match Details] Player not found for userId:', targetUserId);
-      console.log('[Match Details] Available players:', players.map(p => ({
-        userId: p.userId || p.user_id,
-        team: p.team,
-      })));
       return null;
     }
     
@@ -232,17 +227,7 @@ export default function MatchDetailScreen() {
   // Get user's side and creator's side using helper
   const mySide = getUserSide(match.players, userId);
   const creatorSide = getUserSide(match.players, match.createdBy);
-  
-  // Debug logging
-  console.log('[Match Details] Confirmation check:', {
-    userId,
-    createdBy: match.createdBy,
-    isCreator,
-    mySide,
-    creatorSide,
-    playersCount: match.players?.length,
-  });
-  
+
   // Check if team data is incomplete
   const hasIncompleteSides = (mySide === null || creatorSide === null) && !isConfirmed;
   
