@@ -1,0 +1,70 @@
+{
+    "expo":  {
+                 "name":  "Rackt",
+                 "slug":  "rackt",
+                 "version":  "1.0.0",
+                 "orientation":  "portrait",
+                 "icon":  "./assets/images/logo.png",
+                 "scheme":  "rackt",
+                 "userInterfaceStyle":  "automatic",
+                 "newArchEnabled":  true,
+                 "ios":  {
+                             "supportsTablet":  true
+                         },
+                 "android":  {
+                                 "package":  "com.taivas.rackt",
+                                 "adaptiveIcon":  {
+                                                      "foregroundImage":  "./assets/images/logo.png",
+                                                      "backgroundColor":  "#ffffff"
+                                                  },
+                                 "edgeToEdgeEnabled":  true,
+                                 "versionCode":  204,
+                                 "blockedPermissions":  [
+                                                            "android.permission.ACTIVITY_RECOGNITION",
+                                                            "android.permission.READ_MEDIA_IMAGES",
+                                                            "android.permission.READ_MEDIA_VIDEO",
+                                                            "android.permission.READ_EXTERNAL_STORAGE",
+                                                            "android.permission.WRITE_EXTERNAL_STORAGE"
+                                                        ]
+                             },
+                 "web":  {
+                             "bundler":  "metro",
+                             "output":  "static",
+                             "favicon":  "./assets/images/logo.png"
+                         },
+                 "plugins":  [
+                                 "expo-router",
+                                 "./plugins/withRemoveActivityRecognition",
+                                 "./plugins/withRemoveReadMediaPermissions",
+                                 [
+                                     "react-native-google-mobile-ads",
+                                     {
+                                         "androidAppId":  "ca-app-pub-4447766624305417~1762608263",
+                                         "userTrackingUsageDescription":  "This identifier will be used to deliver personalized ads to you.",
+                                         "iosAppId":  "ca-app-pub-4447766624305417~2257432285"
+                                     }
+                                 ],
+                                 [
+                                     "expo-splash-screen",
+                                     {
+                                         "imageWidth":  200,
+                                         "backgroundColor":  "#ffffff",
+                                         "resizeMode":  "contain",
+                                         "image":  "./assets/images/logo.png"
+                                     }
+                                 ],
+                                 "expo-web-browser"
+                             ],
+                 "experiments":  {
+                                     "typedRoutes":  true
+                                 },
+                 "extra":  {
+                               "router":  {
+
+                                          },
+                               "eas":  {
+                                           "projectId":  "1aefd107-a463-453c-bd31-e41e248a52fe"
+                                       }
+                           }
+             }
+}
