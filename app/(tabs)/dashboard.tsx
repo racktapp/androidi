@@ -54,11 +54,14 @@ export default function DashboardScreen() {
   const loadInitialData = async () => {
     try {
       setError(null);
-      await loadOverviewData();
-      // Load unread count for bell badge
-      if (userId) {
-        const pending = await loadPendingMatchesCount();
-        setUnreadFeedCount(pending);
+      const pendingCountPromise = userId
+        ? loadPendingMatchesCount().then(setUnreadFeedCount)
+        : Promise.resolve();
+
+      if (activeTab === 'overview') {
+        await Promise.all([loadOverviewData(), pendingCountPromise]);
+      } else {
+        await pendingCountPromise;
       }
     } catch (err: any) {
       console.error('Error loading dashboard:', err);
@@ -135,10 +138,11 @@ export default function DashboardScreen() {
       // Get last active group
       if (thisMonthMatches.length > 0) {
         const lastMatch = thisMonthMatches[thisMonthMatches.length - 1];
+        const lastMatchData = Array.isArray(lastMatch.match) ? lastMatch.match[0] : lastMatch.match;
         const { data: group } = await supabase
           .from('groups')
           .select('id, name')
-          .eq('id', lastMatch.match.group_id)
+          .eq('id', lastMatchData?.group_id)
           .single();
 
         setLastActiveGroup(group);
@@ -152,9 +156,9 @@ export default function DashboardScreen() {
         )
         .slice(0, 3);
 
-      const resultsWithDetails = await Promise.all(
-        recentMatches.map(async (mp: any) => {
-          const { data: match } = await supabase
+      const recentMatchIds = recentMatches.map((match: any) => match.match_id);
+      const { data: recentMatchDetails } = recentMatchIds.length > 0
+        ? await supabase
             .from('matches')
             .select(`
               id,
@@ -163,25 +167,31 @@ export default function DashboardScreen() {
               match_players(user_id, team, user:user_id(username, display_name)),
               match_sets(set_number, team_a_score, team_b_score)
             `)
-            .eq('id', mp.match_id)
-            .single();
+            .in('id', recentMatchIds)
+        : { data: [] as any[] };
 
-          if (!match) return null;
-
-          const opponentPlayer = match.match_players.find((p: any) => p.user_id !== userId);
-          const won = mp.team === match.winner_team;
-          const sets = normalizeMatchSets(match);
-          const scoreDisplay = sets.map(s => `${s.a}–${s.b}`).join(' ');
-
-          return {
-            id: match.id,
-            won,
-            opponent: opponentPlayer?.user?.display_name || opponentPlayer?.user?.username || 'Unknown',
-            score: scoreDisplay,
-            sport: match.sport,
-          };
-        })
+      const recentMatchMap = new Map(
+        (recentMatchDetails || []).map((match: any) => [match.id, match])
       );
+
+      const resultsWithDetails = recentMatches.map((mp: any) => {
+        const match = recentMatchMap.get(mp.match_id);
+
+        if (!match) return null;
+
+        const opponentPlayer = match.match_players.find((p: any) => p.user_id !== userId);
+        const won = mp.team === match.winner_team;
+        const sets = normalizeMatchSets(match);
+        const scoreDisplay = sets.map((s: any) => `${s.a}–${s.b}`).join(' ');
+
+        return {
+          id: match.id,
+          won,
+          opponent: opponentPlayer?.user?.display_name || opponentPlayer?.user?.username || 'Unknown',
+          score: scoreDisplay,
+          sport: match.sport,
+        };
+      });
 
       setRecentResults(resultsWithDetails.filter(Boolean));
 

@@ -69,8 +69,6 @@ export const tournamentsService = {
   },
 
   async getTournamentById(tournamentId: string, currentUserId?: string): Promise<Tournament | null> {
-    console.log(`[tournamentDetailFetch] START - tournamentId=${tournamentId}, userId=${currentUserId}`);
-    
     // Use array query instead of .single() to avoid throwing on 0 rows
     const { data, error } = await supabase
       .from('tournaments')
@@ -90,11 +88,9 @@ export const tournamentsService = {
     }
     
     const resultCount = data?.length || 0;
-    console.log('[tournamentDetailFetch] resultCount:', resultCount);
 
     // Handle 3 cases explicitly
     if (resultCount === 0) {
-      console.log('[tournamentDetailFetch] NOT_FOUND - No tournament with this ID or RLS blocked access');
       return null; // Return null instead of throwing
     }
 
@@ -107,12 +103,6 @@ export const tournamentsService = {
     }
     
     const tournament = data[0];
-    console.log('[tournamentDetailFetch] SUCCESS:', {
-      id: tournament.id,
-      title: tournament.title,
-      state: tournament.state,
-      participantCount: tournament.participants?.length || 0,
-    });
     
     return this.mapTournament(tournament);
   },
@@ -217,29 +207,29 @@ export const tournamentsService = {
     // Supabase join doesn't respect deleted_at filter, so we filter client-side
     const invites = (data || [])
       .filter(raw => {
+        const tournament = Array.isArray(raw.tournament) ? raw.tournament[0] : raw.tournament;
+
         // Exclude invites where tournament is deleted
-        if (raw.tournament && raw.tournament.deleted_at) {
-          console.log(`[getPendingInvites] Filtering out invite for deleted tournament: ${raw.tournament.title}`);
+        if (tournament && tournament.deleted_at) {
           return false;
         }
         // Exclude invites where tournament doesn't exist
-        if (!raw.tournament) {
-          console.log('[getPendingInvites] Filtering out invite with missing tournament');
+        if (!tournament) {
           return false;
         }
         return true;
       })
       .map(raw => ({
         ...this.mapInvite(raw),
-        tournament: raw.tournament ? this.mapTournament(raw.tournament) : undefined,
+        tournament: raw.tournament
+          ? this.mapTournament(Array.isArray(raw.tournament) ? raw.tournament[0] : raw.tournament)
+          : undefined,
       }));
 
     return invites;
   },
 
   async respondToInvite(inviteId: string, accept: boolean): Promise<{ ok: boolean; tournamentId?: string; joined?: boolean; participantRecordFound?: boolean; error?: string }> {
-    console.log(`[respondToInvite] Calling Edge Function - inviteId=${inviteId}, accept=${accept}`);
-
     try {
       const { data, error } = await supabase.functions.invoke('accept-tournament-invite', {
         body: { inviteId, accept },
@@ -265,7 +255,6 @@ export const tournamentsService = {
         throw new Error(errorMessage);
       }
 
-      console.log('[respondToInvite] Edge Function success:', data);
       return data;
     } catch (err: any) {
       console.error('[respondToInvite] Exception:', err);
@@ -308,10 +297,7 @@ export const tournamentsService = {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('Not authenticated');
 
-    console.log(`[deleteTournament] START - tournamentId=${tournamentId}, userId=${user.id}`);
-
     // STEP 1: Verify user is creator
-    console.log('[deleteTournament] STEP 1: Verifying creator permissions...');
     const { data: tournament, error: fetchError } = await supabase
       .from('tournaments')
       .select('created_by_user_id, state, title')
@@ -327,14 +313,6 @@ export const tournamentsService = {
       throw new Error('Tournament not found');
     }
 
-    console.log('[deleteTournament] Tournament data:', {
-      id: tournamentId,
-      title: tournament.title,
-      state: tournament.state,
-      creatorId: tournament.created_by_user_id,
-      currentUserId: user.id,
-    });
-
     if (tournament.created_by_user_id !== user.id) {
       console.error('[deleteTournament] ERROR - Permission denied:', {
         creatorId: tournament.created_by_user_id,
@@ -342,8 +320,6 @@ export const tournamentsService = {
       });
       throw new Error('Only the tournament creator can delete this tournament');
     }
-
-    console.log(`[deleteTournament] STEP 2: Soft-deleting tournament: ${tournament.title}`);
 
     // Soft delete: set deleted_at timestamp instead of changing state
     // This preserves data integrity and allows recovery if needed
@@ -366,10 +342,7 @@ export const tournamentsService = {
       throw new Error(`Failed to delete tournament: ${deleteError.message || 'Unknown error'}`);
     }
 
-    console.log('[deleteTournament] SUCCESS - Tournament soft-deleted (deleted_at set)');
-
     // STEP 3: Mark all related invites as expired
-    console.log('[deleteTournament] STEP 3: Expiring pending invites...');
     const { error: inviteError } = await supabase
       .from('tournament_invites')
       .update({ status: 'expired' })
@@ -379,11 +352,7 @@ export const tournamentsService = {
     if (inviteError) {
       console.error('[deleteTournament] WARNING - Failed to expire invites:', inviteError);
       // Non-critical - tournament is already deleted
-    } else {
-      console.log('[deleteTournament] SUCCESS - Pending invites expired');
     }
-
-    console.log('[deleteTournament] COMPLETE - Tournament deleted successfully');
   },
 
   mapTournament(raw: any): Tournament {

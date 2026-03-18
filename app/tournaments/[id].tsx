@@ -75,19 +75,15 @@ export default function TournamentDetailScreen() {
     try {
       setError(null);
       setNotFoundState('loading');
-      
-      console.log('[TournamentDetail] Loading tournament:', id, 'for user:', userId);
-      
+
       const data = await tournamentsService.getTournamentById(id as string, userId || undefined);
       
       if (!data) {
         // Tournament not found or not accessible
-        console.log('[TournamentDetail] Tournament not found or not accessible yet');
         setNotFoundState('access_pending');
         setTournament(null);
         setError('Tournament not found or not accessible yet');
       } else {
-        console.log('[TournamentDetail] Tournament loaded successfully:', data.title);
         setNotFoundState('success');
         setTournament(data);
         setError(null);
@@ -228,21 +224,16 @@ export default function TournamentDetailScreen() {
 
   const handleDeleteTournament = async () => {
     if (!tournament) return;
-
-    console.log(`[TournamentDelete] User confirmed deletion - tournamentId=${tournament.id}, userId=${userId}`);
     
     setShowDeleteConfirm(false);
     setDeletingTournament(true);
     
     try {
-      console.log('[TournamentDelete] Calling deleteTournament service...');
       await tournamentsService.deleteTournament(tournament.id);
-      console.log('[TournamentDelete] Service call successful');
       
       showAlert('Tournament Deleted', 'This tournament has been permanently deleted.');
       
       // Navigate back after short delay
-      console.log('[TournamentDelete] Navigating back...');
       setTimeout(() => {
         router.back();
       }, 1000);

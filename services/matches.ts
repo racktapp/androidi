@@ -189,7 +189,6 @@ export const matchesService = {
   },
 
   async getLeaderboard(groupId: string, sport: Sport, period: 'monthly' | 'alltime') {
-    // Get group members
     const { data: members } = await supabase
       .from('group_members')
       .select('user_id, user:user_id(id, username, display_name, email, initials, avatar_url)')
@@ -198,59 +197,77 @@ export const matchesService = {
     if (!members) return [];
 
     const userIds = members.map((m: any) => m.user_id);
+    if (userIds.length === 0) return [];
 
-    // Get ratings
-    const { data: ratings } = await supabase
-      .from('user_ratings')
-      .select('*')
-      .in('user_id', userIds)
-      .eq('sport', sport);
+    const [{ data: ratings }, { data: playerMatches }] = await Promise.all([
+      supabase
+        .from('user_ratings')
+        .select('*')
+        .in('user_id', userIds)
+        .eq('sport', sport),
+      supabase
+        .from('match_players')
+        .select('user_id, team, match:match_id(id, winner_team, status, sport, group_id, created_at)')
+        .in('user_id', userIds),
+    ]);
 
     const ratingsMap = new Map(ratings?.map(r => [r.user_id, r]) || []);
+    const now = new Date();
+    const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
+    const statsByUser = new Map<string, { wins: number; losses: number }>();
 
-    // Build leaderboard
-    const leaderboard = await Promise.all(
-      members.map(async (member: any) => {
-        const rating = ratingsMap.get(member.user_id);
-        
-        // Get match stats
-        let query = supabase
-          .from('match_players')
-          .select('match_id, team, match:match_id(id, winner_team, status, sport, group_id, created_at)')
-          .eq('user_id', member.user_id);
+    for (const userId of userIds) {
+      statsByUser.set(userId, { wins: 0, losses: 0 });
+    }
 
-        const { data: playerMatches } = await query;
+    for (const playerMatch of playerMatches || []) {
+      const match = Array.isArray(playerMatch.match) ? playerMatch.match[0] : playerMatch.match;
 
-        const matches = (playerMatches || [])
-          .filter((pm: any) => 
-            pm.match.status === 'confirmed' &&
-            pm.match.sport === sport &&
-            pm.match.group_id === groupId
-          )
-          .filter((pm: any) => {
-            if (period === 'monthly') {
-              const now = new Date();
-              const matchDate = new Date(pm.match.created_at);
-              return matchDate.getMonth() === now.getMonth() &&
-                     matchDate.getFullYear() === now.getFullYear();
-            }
-            return true;
-          });
+      if (
+        !match ||
+        match.status !== 'confirmed' ||
+        match.sport !== sport ||
+        match.group_id !== groupId
+      ) {
+        continue;
+      }
 
-        const wins = matches.filter((pm: any) => pm.team === pm.match.winner_team).length;
-        const losses = matches.length - wins;
+      if (period === 'monthly') {
+        const matchDate = new Date(match.created_at);
+        if (
+          matchDate.getMonth() !== currentMonth ||
+          matchDate.getFullYear() !== currentYear
+        ) {
+          continue;
+        }
+      }
 
-        return {
-          userId: member.user_id,
-          user: member.user,
-          level: rating?.level || 0,
-          reliability: rating?.reliability || 0,
-          wins,
-          losses,
-          winPercentage: matches.length > 0 ? (wins / matches.length) * 100 : 0,
-        };
-      })
-    );
+      const stats = statsByUser.get(playerMatch.user_id);
+      if (!stats) continue;
+
+      if (playerMatch.team === match.winner_team) {
+        stats.wins += 1;
+      } else {
+        stats.losses += 1;
+      }
+    }
+
+    const leaderboard = members.map((member: any) => {
+      const rating = ratingsMap.get(member.user_id);
+      const stats = statsByUser.get(member.user_id) || { wins: 0, losses: 0 };
+      const totalMatches = stats.wins + stats.losses;
+
+      return {
+        userId: member.user_id,
+        user: member.user,
+        level: rating?.level || 0,
+        reliability: rating?.reliability || 0,
+        wins: stats.wins,
+        losses: stats.losses,
+        winPercentage: totalMatches > 0 ? (stats.wins / totalMatches) * 100 : 0,
+      };
+    });
 
     // Sort and rank (by wins, then level as tiebreaker)
     leaderboard.sort((a, b) => {
