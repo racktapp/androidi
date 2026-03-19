@@ -5,7 +5,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Colors, Typography, BorderRadius, Spacing } from '@/constants/theme';
-import { ScreenLoader, EmptyState, ErrorState, Avatar } from '@/components';
+import { ScreenLoader, EmptyState, ErrorState } from '@/components';
 import { getSupabaseClient } from '@/template';
 import { userService } from '@/services/user';
 import { tournamentsService } from '@/services/tournaments';
@@ -17,6 +17,85 @@ const supabase = getSupabaseClient();
 
 type TabType = 'overview' | 'tournaments';
 
+type DashboardStats = {
+  wins: number;
+  losses: number;
+  winRate: number;
+  matchesPlayed: number;
+};
+
+type DashboardGroupSummary = {
+  id: string;
+  name: string;
+};
+
+type DashboardRecentResult = {
+  id: string;
+  won: boolean;
+  opponent: string;
+  score: string;
+  sport: string | null;
+};
+
+const asArray = <T,>(value: unknown): T[] => (Array.isArray(value) ? value : []);
+
+const unwrapRelation = <T,>(value: T | T[] | null | undefined): T | null =>
+  Array.isArray(value) ? value[0] ?? null : value ?? null;
+
+const asNonEmptyString = (value: unknown, fallback: string): string =>
+  typeof value === 'string' && value.trim().length > 0 ? value.trim() : fallback;
+
+const asFiniteNumber = (value: unknown, fallback = 0): number =>
+  typeof value === 'number' && Number.isFinite(value) ? value : fallback;
+
+const isValidDateValue = (value: unknown): value is string | number | Date => {
+  if (value instanceof Date) {
+    return !Number.isNaN(value.getTime());
+  }
+
+  if (typeof value !== 'string' && typeof value !== 'number') {
+    return false;
+  }
+
+  return !Number.isNaN(new Date(value).getTime());
+};
+
+const getSportLabel = (sport: unknown): string => {
+  if (typeof sport !== 'string' || sport.trim().length === 0) {
+    return 'Unknown';
+  }
+
+  const normalized = sport.trim();
+  return normalized.charAt(0).toUpperCase() + normalized.slice(1);
+};
+
+const getPlayerLabel = (user: any, fallback = 'Unknown'): string =>
+  asNonEmptyString(user?.display_name, '') ||
+  asNonEmptyString(user?.displayName, '') ||
+  asNonEmptyString(user?.username, fallback);
+
+const getPlayerShortLabel = (user: any, fallback = 'Player'): string => {
+  const preferredName = asNonEmptyString(user?.display_name, '') || asNonEmptyString(user?.displayName, '');
+
+  if (preferredName) {
+    return preferredName.split(' ')[0];
+  }
+
+  return asNonEmptyString(user?.username, fallback);
+};
+
+const getTournamentTitle = (title: unknown): string => asNonEmptyString(title, 'Untitled tournament');
+
+const getTournamentParticipantCount = (participants: unknown): number => asArray(participants).length;
+
+const getRatingDeltaLabel = (value: unknown): string | null => {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return null;
+  }
+
+  return `${value > 0 ? '+' : ''}${value.toFixed(1)}`;
+};
+
 export default function DashboardScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -25,10 +104,10 @@ export default function DashboardScreen() {
   const [activeTab, setActiveTab] = useState<TabType>('overview');
   const [unreadFeedCount, setUnreadFeedCount] = useState<number>(0);
   const [events, setEvents] = useState<any[]>([]);
-  const [pendingMatches, setPendingMatches] = useState<any[]>([]);
-  const [stats, setStats] = useState<any>(null);
-  const [lastActiveGroup, setLastActiveGroup] = useState<any>(null);
-  const [recentResults, setRecentResults] = useState<any[]>([]);
+  const [pendingMatches] = useState<any[]>([]);
+  const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [lastActiveGroup, setLastActiveGroup] = useState<DashboardGroupSummary | null>(null);
+  const [recentResults, setRecentResults] = useState<DashboardRecentResult[]>([]);
   const [activeTournament, setActiveTournament] = useState<Tournament | null>(null);
   const [tournamentProgress, setTournamentProgress] = useState<any>(null);
   const [recentTournaments, setRecentTournaments] = useState<any[]>([]);
@@ -47,8 +126,16 @@ export default function DashboardScreen() {
   }, [userId, activeTab]);
 
   const loadUserId = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    setUserId(user?.id || null);
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      setUserId(user?.id || null);
+    } catch (err: any) {
+      console.error('Error loading dashboard user:', err);
+      setError(err?.message || 'Failed to load dashboard');
+      setIsLoadingInitial(false);
+    }
   };
 
   const loadInitialData = async () => {
@@ -95,9 +182,10 @@ export default function DashboardScreen() {
         `)
         .eq('user_id', userId);
 
-      const pending = (matchPlayers || [])
-        .map((mp: any) => mp.match)
-        .filter((m: any) => m && m.status === 'pending' && m.created_by !== userId);
+      const pending = asArray<any>(matchPlayers)
+        .map((matchPlayer) => unwrapRelation(matchPlayer?.match))
+        .filter((match): match is any => Boolean(match))
+        .filter((match) => match.status === 'pending' && match.created_by !== userId);
 
       return pending.length;
     } catch (err) {
@@ -118,14 +206,31 @@ export default function DashboardScreen() {
         .select('match_id, team, match:match_id(id, winner_team, status, type, created_at, group_id)')
         .eq('user_id', userId);
 
-      const thisMonthMatches = (matchPlayers || [])
-        .filter((mp: any) => 
-          mp.match?.status === 'confirmed' &&
-          mp.match?.type === 'competitive' &&
-          new Date(mp.match.created_at) >= new Date(startOfMonth)
-        );
+      const normalizedMatchPlayers = asArray<any>(matchPlayers)
+        .map((matchPlayer) => {
+          const match = unwrapRelation(matchPlayer?.match);
+          return match ? { ...matchPlayer, match } : null;
+        })
+        .filter((matchPlayer): matchPlayer is { match_id: string; team: 'A' | 'B'; match: any } => {
+          if (!matchPlayer?.match) {
+            return false;
+          }
 
-      const wins = thisMonthMatches.filter((mp: any) => mp.team === mp.match.winner_team).length;
+          if (!isValidDateValue(matchPlayer.match.created_at)) {
+            return false;
+          }
+
+          return true;
+        });
+
+      const thisMonthMatches = normalizedMatchPlayers.filter(
+        (matchPlayer) =>
+          matchPlayer.match.status === 'confirmed' &&
+          matchPlayer.match.type === 'competitive' &&
+          new Date(matchPlayer.match.created_at) >= new Date(startOfMonth)
+      );
+
+      const wins = thisMonthMatches.filter((matchPlayer) => matchPlayer.team === matchPlayer.match.winner_team).length;
       const losses = thisMonthMatches.length - wins;
 
       setStats({
@@ -138,25 +243,36 @@ export default function DashboardScreen() {
       // Get last active group
       if (thisMonthMatches.length > 0) {
         const lastMatch = thisMonthMatches[thisMonthMatches.length - 1];
-        const lastMatchData = Array.isArray(lastMatch.match) ? lastMatch.match[0] : lastMatch.match;
+        const lastMatchData = unwrapRelation(lastMatch.match);
         const { data: group } = await supabase
           .from('groups')
           .select('id, name')
           .eq('id', lastMatchData?.group_id)
           .single();
 
-        setLastActiveGroup(group);
+        setLastActiveGroup(
+          group
+            ? {
+                id: asNonEmptyString(group.id, ''),
+                name: asNonEmptyString(group.name, 'Unnamed group'),
+              }
+            : null
+        );
+      } else {
+        setLastActiveGroup(null);
       }
 
       // Get recent competitive results (last 3)
-      const recentMatches = (matchPlayers || [])
-        .filter((mp: any) => mp.match?.status === 'confirmed' && mp.match?.type === 'competitive')
-        .sort((a: any, b: any) => 
-          new Date(b.match.created_at).getTime() - new Date(a.match.created_at).getTime()
+      const recentMatches = normalizedMatchPlayers
+        .filter((matchPlayer) => matchPlayer.match.status === 'confirmed' && matchPlayer.match.type === 'competitive')
+        .sort(
+          (a, b) => new Date(b.match.created_at).getTime() - new Date(a.match.created_at).getTime()
         )
         .slice(0, 3);
 
-      const recentMatchIds = recentMatches.map((match: any) => match.match_id);
+      const recentMatchIds = recentMatches
+        .map((match) => match.match_id)
+        .filter((matchId): matchId is string => typeof matchId === 'string' && matchId.length > 0);
       const { data: recentMatchDetails } = recentMatchIds.length > 0
         ? await supabase
             .from('matches')
@@ -171,29 +287,35 @@ export default function DashboardScreen() {
         : { data: [] as any[] };
 
       const recentMatchMap = new Map(
-        (recentMatchDetails || []).map((match: any) => [match.id, match])
+        asArray<any>(recentMatchDetails)
+          .filter((match) => typeof match?.id === 'string' && match.id.length > 0)
+          .map((match) => [match.id, match] as const)
       );
 
-      const resultsWithDetails = recentMatches.map((mp: any) => {
-        const match = recentMatchMap.get(mp.match_id);
+      const resultsWithDetails = recentMatches.map((matchPlayer) => {
+        const match = recentMatchMap.get(matchPlayer.match_id);
 
         if (!match) return null;
 
-        const opponentPlayer = match.match_players.find((p: any) => p.user_id !== userId);
-        const won = mp.team === match.winner_team;
+        const opponentPlayer = asArray<any>(match.match_players).find(
+          (player) => player?.user_id !== userId
+        );
+        const won = matchPlayer.team === match.winner_team;
         const sets = normalizeMatchSets(match);
-        const scoreDisplay = sets.map((s: any) => `${s.a}–${s.b}`).join(' ');
+        const scoreDisplay = sets.length > 0 ? sets.map((set) => `${set.a}–${set.b}`).join(' ') : 'Score unavailable';
 
         return {
-          id: match.id,
+          id: asNonEmptyString(match.id, `${matchPlayer.match_id}`),
           won,
-          opponent: opponentPlayer?.user?.display_name || opponentPlayer?.user?.username || 'Unknown',
+          opponent: getPlayerLabel(opponentPlayer?.user, 'Unknown'),
           score: scoreDisplay,
-          sport: match.sport,
+          sport: typeof match.sport === 'string' ? match.sport : null,
         };
       });
 
-      setRecentResults(resultsWithDetails.filter(Boolean));
+      setRecentResults(
+        resultsWithDetails.filter((result): result is DashboardRecentResult => Boolean(result))
+      );
 
       // Get tournament summary
       const activeTourn = await tournamentsService.getActiveTournamentForUser(userId);
@@ -202,13 +324,23 @@ export default function DashboardScreen() {
       if (activeTourn) {
         const progress = await tournamentsService.getTournamentProgress(activeTourn);
         setTournamentProgress(progress);
+      } else {
+        setTournamentProgress(null);
       }
 
       const recentTourns = await tournamentsService.getRecentCompletedTournamentsForUser(userId, 3);
       setRecentTournaments(recentTourns);
+      setError(null);
 
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error loading overview:', err);
+      setStats(null);
+      setLastActiveGroup(null);
+      setRecentResults([]);
+      setActiveTournament(null);
+      setTournamentProgress(null);
+      setRecentTournaments([]);
+      setError(err?.message || 'Failed to load dashboard');
     }
   };
 
@@ -219,6 +351,10 @@ export default function DashboardScreen() {
   }, [userId, activeTab]);
 
   const formatDate = (dateString: string) => {
+    if (!isValidDateValue(dateString)) {
+      return 'Recently';
+    }
+
     const date = new Date(dateString);
     const now = new Date();
     const diffMs = now.getTime() - date.getTime();
@@ -226,6 +362,7 @@ export default function DashboardScreen() {
     const diffHours = Math.floor(diffMs / 3600000);
     const diffDays = Math.floor(diffMs / 86400000);
 
+    if (diffMins < 0 || diffHours < 0 || diffDays < 0) return 'Recently';
     if (diffMins < 60) return `${diffMins}m ago`;
     if (diffHours < 24) return `${diffHours}h ago`;
     if (diffDays === 0) return 'Today';
@@ -237,8 +374,10 @@ export default function DashboardScreen() {
     let icon = '📢';
     let description = '';
 
-    const groupName = event.group?.name || event.metadata?.group_name || 'a group';
-    const userName = event.user?.display_name || event.user?.username || 'Someone';
+    const groupName =
+      asNonEmptyString(event?.group?.name, '') ||
+      asNonEmptyString(event?.metadata?.group_name, 'a group');
+    const userName = getPlayerLabel(event?.user, 'Someone');
 
     if (!event.group?.name && event.group_id) {
       console.warn('[Feed] Missing group name for event:', {
@@ -297,13 +436,15 @@ export default function DashboardScreen() {
           {pendingMatches.map((match) => {
             const sets = normalizeMatchSets(match);
             const { setsWonA, setsWonB } = calculateSetsWon(sets);
-            const teamAPlayers = match.players?.filter((p: any) => p.team === 'A') || [];
-            const teamBPlayers = match.players?.filter((p: any) => p.team === 'B') || [];
+            const teamAPlayers = asArray<any>(match?.players).filter((player) => player?.team === 'A');
+            const teamBPlayers = asArray<any>(match?.players).filter((player) => player?.team === 'B');
 
             const getTeamName = (players: any[]) => {
-              return players
-                .map((p: any) => p.user?.display_name?.split(' ')[0] || p.user?.username || 'Player')
-                .join(' / ');
+              const names = players
+                .map((player: any) => getPlayerShortLabel(player?.user, 'Player'))
+                .filter(Boolean);
+
+              return names.length > 0 ? names.join(' / ') : 'Players';
             };
 
             return (
@@ -314,7 +455,9 @@ export default function DashboardScreen() {
               >
                 <View style={styles.pendingHeader}>
                   <MaterialIcons name="sports-tennis" size={20} color={Colors.primary} />
-                  <Text style={styles.pendingGroup}>{match.group?.name}</Text>
+                  <Text style={styles.pendingGroup}>
+                    {asNonEmptyString(match?.group?.name, 'Match')}
+                  </Text>
                 </View>
 
                 <View style={styles.matchupRow}>
@@ -422,7 +565,7 @@ export default function DashboardScreen() {
                   />
                   <View style={{ flex: 1 }}>
                     <Text style={styles.tournamentTitle} numberOfLines={1}>
-                      {activeTournament.title}
+                      {getTournamentTitle(activeTournament.title)}
                     </Text>
                     <View style={styles.tournamentMeta}>
                       <Text style={styles.tournamentMetaText}>
@@ -461,16 +604,16 @@ export default function DashboardScreen() {
                 <View style={styles.tournamentDetailRow}>
                   <MaterialIcons name="people" size={14} color={Colors.textMuted} />
                   <Text style={styles.tournamentDetailText}>
-                    {activeTournament.participants.length} players
+                    {getTournamentParticipantCount(activeTournament.participants)} players
                   </Text>
                 </View>
                 {tournamentProgress && (
                   <View style={styles.tournamentDetailRow}>
                     <MaterialIcons name="info-outline" size={14} color={Colors.textMuted} />
                     <Text style={styles.tournamentDetailText}>
-                      {tournamentProgress.stage
+                      {asNonEmptyString(tournamentProgress?.stage, '')
                         ? `Stage: ${tournamentProgress.stage}`
-                        : `Rounds: ${tournamentProgress.roundsCompleted} / ${tournamentProgress.totalRounds}`
+                        : `Rounds: ${asFiniteNumber(tournamentProgress?.roundsCompleted)} / ${asFiniteNumber(tournamentProgress?.totalRounds)}`
                       }
                     </Text>
                   </View>
@@ -490,54 +633,58 @@ export default function DashboardScreen() {
               {activeTournament && (
                 <Text style={styles.recentTournamentsTitle}>Recent Completed</Text>
               )}
-              {recentTournaments.map((tournament) => (
-                <Pressable
-                  key={tournament.id}
-                  style={styles.completedTournamentRow}
-                  onPress={() => router.push(`/tournaments/${tournament.id}`)}
-                >
-                  <Image
-                    source={tournament.sport === 'tennis' 
-                      ? require('@/assets/icons/tennis_icon.png')
-                      : require('@/assets/icons/padel_icon.png')
-                    }
-                    style={styles.completedTournamentIcon}
-                    contentFit="contain"
-                    transition={0}
-                  />
-                  <View style={styles.completedTournamentInfo}>
-                    <Text style={styles.completedTournamentTitle} numberOfLines={1}>
-                      {tournament.title}
-                    </Text>
-                    <View style={styles.completedTournamentMeta}>
-                      <Text style={styles.completedTournamentMetaText}>
-                        {tournament.type === 'americano' ? 'Americano' : 'Tournament'}
+              {recentTournaments.map((tournament) => {
+                const ratingDeltaLabel = getRatingDeltaLabel(tournament?.ratingDelta);
+
+                return (
+                  <Pressable
+                    key={tournament.id}
+                    style={styles.completedTournamentRow}
+                    onPress={() => router.push(`/tournaments/${tournament.id}`)}
+                  >
+                    <Image
+                      source={tournament.sport === 'tennis'
+                        ? require('@/assets/icons/tennis_icon.png')
+                        : require('@/assets/icons/padel_icon.png')
+                      }
+                      style={styles.completedTournamentIcon}
+                      contentFit="contain"
+                      transition={0}
+                    />
+                    <View style={styles.completedTournamentInfo}>
+                      <Text style={styles.completedTournamentTitle} numberOfLines={1}>
+                        {getTournamentTitle(tournament?.title)}
                       </Text>
-                      {tournament.placement && (
-                        <>
-                          <Text style={styles.metaDot}>•</Text>
-                          <Text style={styles.completedTournamentPlacement}>
-                            {tournament.placement}
-                          </Text>
-                        </>
-                      )}
-                      {tournament.ratingDelta !== undefined && (
-                        <>
-                          <Text style={styles.metaDot}>•</Text>
-                          <Text style={[
-                            styles.completedTournamentDelta,
-                            tournament.ratingDelta > 0 && { color: Colors.success },
-                            tournament.ratingDelta < 0 && { color: Colors.danger },
-                          ]}>
-                            {tournament.ratingDelta > 0 ? '+' : ''}{tournament.ratingDelta.toFixed(1)}
-                          </Text>
-                        </>
-                      )}
+                      <View style={styles.completedTournamentMeta}>
+                        <Text style={styles.completedTournamentMetaText}>
+                          {tournament.type === 'americano' ? 'Americano' : 'Tournament'}
+                        </Text>
+                        {asNonEmptyString(tournament?.placement, '') && (
+                          <>
+                            <Text style={styles.metaDot}>•</Text>
+                            <Text style={styles.completedTournamentPlacement}>
+                              {tournament.placement}
+                            </Text>
+                          </>
+                        )}
+                        {ratingDeltaLabel && (
+                          <>
+                            <Text style={styles.metaDot}>•</Text>
+                            <Text style={[
+                              styles.completedTournamentDelta,
+                              typeof tournament?.ratingDelta === 'number' && tournament.ratingDelta > 0 && { color: Colors.success },
+                              typeof tournament?.ratingDelta === 'number' && tournament.ratingDelta < 0 && { color: Colors.danger },
+                            ]}>
+                              {ratingDeltaLabel}
+                            </Text>
+                          </>
+                        )}
+                      </View>
                     </View>
-                  </View>
-                  <MaterialIcons name="chevron-right" size={20} color={Colors.textMuted} />
-                </Pressable>
-              ))}
+                    <MaterialIcons name="chevron-right" size={20} color={Colors.textMuted} />
+                  </Pressable>
+                );
+              })}
             </View>
           )}
         </View>
@@ -640,7 +787,7 @@ export default function DashboardScreen() {
                   <Text style={styles.resultScore}>{result.score}</Text>
                 </View>
                 <Text style={styles.resultSport}>
-                  {result.sport.charAt(0).toUpperCase() + result.sport.slice(1)}
+                  {getSportLabel(result.sport)}
                 </Text>
               </Pressable>
             ))}
