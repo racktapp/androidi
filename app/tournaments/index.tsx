@@ -1,17 +1,15 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable, RefreshControl, Modal } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Pressable, RefreshControl } from 'react-native';
 import { Image } from 'expo-image';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Colors, Typography, BorderRadius, Spacing } from '@/constants/theme';
-import { ScreenLoader, EmptyState, ErrorState, UserAvatar, UserName, LoadingSpinner } from '@/components';
-import { useAlert } from '@/template';
+import { ScreenLoader, EmptyState, ErrorState } from '@/components';
+import { useAlert , getSupabaseClient } from '@/template';
 import { tournamentsService } from '@/services/tournaments';
 import { Tournament, TournamentInvite } from '@/types';
-import { getSupabaseClient } from '@/template';
 import { useGroups } from '@/hooks/useGroups';
-import { friendsService } from '@/services/friends';
 
 const supabase = getSupabaseClient();
 
@@ -44,23 +42,12 @@ export default function TournamentsHomeScreen() {
     loadUserId();
   }, []);
 
-  useEffect(() => {
-    if (userId) {
-      loadTournaments();
-      loadGroups();
-    }
-  }, [userId]);
-
-
-
   const loadUserId = async () => {
     const { data: { user } } = await supabase.auth.getUser();
     setUserId(user?.id || null);
   };
 
-
-
-  const loadTournaments = async () => {
+  const loadTournaments = useCallback(async () => {
     if (!userId) return;
     try {
       setError(null);
@@ -78,9 +65,9 @@ export default function TournamentsHomeScreen() {
     } finally {
       setIsLoadingInitial(false);
     }
-  };
+  }, [userId]);
 
-  const loadGroups = async () => {
+  const loadGroups = useCallback(async () => {
     if (!userId) return;
     try {
       const groupsData = await getUserGroups(userId);
@@ -88,7 +75,14 @@ export default function TournamentsHomeScreen() {
     } catch (err: any) {
       console.error('Error loading groups:', err);
     }
-  };
+  }, [getUserGroups, userId]);
+
+  useEffect(() => {
+    if (userId) {
+      void loadTournaments();
+      void loadGroups();
+    }
+  }, [loadGroups, loadTournaments, userId]);
 
 
 
@@ -96,7 +90,7 @@ export default function TournamentsHomeScreen() {
     setRefreshing(true);
     await Promise.all([loadTournaments(), loadGroups()]);
     setRefreshing(false);
-  }, [userId]);
+  }, [loadGroups, loadTournaments]);
 
   const handleRespondToInvite = async (inviteId: string, accept: boolean) => {
     setRespondingToInvite(inviteId);

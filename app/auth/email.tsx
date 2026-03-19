@@ -1,20 +1,17 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, KeyboardAvoidingView, Platform, Pressable } from 'react-native';
+import { View, Text, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
 import { Image } from 'expo-image';
-import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { useAlert } from '@/template';
-import { Button, Input } from '@/components';
-import { Colors, Typography, BorderRadius, Spacing } from '@/constants/theme';
 import { getSupabaseClient } from '@/template';
+import { Button, Input } from '@/components';
+import { Colors, Typography, Spacing } from '@/constants/theme';
 
 const supabase = getSupabaseClient();
 
 export default function EmailAuthScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { showAlert } = useAlert();
 
   const [email, setEmail] = useState('');
   const [error, setError] = useState<string | null>(null);

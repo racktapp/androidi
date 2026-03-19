@@ -1,15 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable } from 'react-native';
 import { Image } from 'expo-image';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Colors, Typography, BorderRadius, Spacing } from '@/constants/theme';
-import { Button, UserAvatar, UserName, ScreenLoader, ErrorState, LoadingSpinner } from '@/components';
+import { Button, UserAvatar, UserName, ScreenLoader, LoadingSpinner } from '@/components';
 import { tournamentsService } from '@/services/tournaments';
 import { Tournament, TournamentGroup, TournamentMatch, TournamentStanding, AmericanoLeaderboardEntry, AmericanoPairLeaderboardEntry } from '@/types';
-import { getSupabaseClient } from '@/template';
-import { useAlert } from '@/template';
+import { getSupabaseClient , useAlert } from '@/template';
 
 const supabase = getSupabaseClient();
 
@@ -35,7 +34,7 @@ export default function TournamentDetailScreen() {
   const [americanoPairLeaderboard, setAmericanoPairLeaderboard] = useState<AmericanoPairLeaderboardEntry[]>([]);
   const [leaderboardView, setLeaderboardView] = useState<LeaderboardViewType>('players');
   const [completingTournament, setCompletingTournament] = useState(false);
-  const [ratingDeltas, setRatingDeltas] = useState<Array<{ userId: string; displayName: string; delta: number }> | null>(null);
+  const [ratingDeltas, setRatingDeltas] = useState<{ userId: string; displayName: string; delta: number }[] | null>(null);
   const [deletingTournament, setDeletingTournament] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -46,30 +45,12 @@ export default function TournamentDetailScreen() {
     loadUserId();
   }, []);
 
-  useEffect(() => {
-    if (userId && id) {
-      loadTournament();
-    }
-  }, [userId, id]);
-
-  useEffect(() => {
-    if (tournament && tournament.state === 'in_progress') {
-      loadTournamentData();
-    }
-  }, [tournament, activeTab]);
-
-  useEffect(() => {
-    if (selectedGroupId) {
-      loadGroupData();
-    }
-  }, [selectedGroupId]);
-
   const loadUserId = async () => {
     const { data: { user } } = await supabase.auth.getUser();
     setUserId(user?.id || null);
   };
 
-  const loadTournament = async () => {
+  const loadTournament = useCallback(async () => {
     if (!id || typeof id !== 'string') return;
 
     try {
@@ -100,9 +81,9 @@ export default function TournamentDetailScreen() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [id, userId]);
 
-  const loadTournamentData = async () => {
+  const loadTournamentData = useCallback(async () => {
     if (!tournament || !id || typeof id !== 'string') return;
 
     try {
@@ -132,9 +113,9 @@ export default function TournamentDetailScreen() {
     } catch (err: any) {
       console.error('Error loading tournament data:', err);
     }
-  };
+  }, [id, selectedGroupId, tournament]);
 
-  const loadGroupData = async () => {
+  const loadGroupData = useCallback(async () => {
     if (!selectedGroupId) return;
 
     try {
@@ -148,7 +129,25 @@ export default function TournamentDetailScreen() {
     } catch (err: any) {
       console.error('Error loading group data:', err);
     }
-  };
+  }, [selectedGroupId]);
+
+  useEffect(() => {
+    if (userId && id) {
+      void loadTournament();
+    }
+  }, [id, loadTournament, userId]);
+
+  useEffect(() => {
+    if (tournament && tournament.state === 'in_progress') {
+      void loadTournamentData();
+    }
+  }, [activeTab, loadTournamentData, tournament]);
+
+  useEffect(() => {
+    if (selectedGroupId) {
+      void loadGroupData();
+    }
+  }, [loadGroupData, selectedGroupId]);
 
   const handleStartTournament = async () => {
     if (!tournament) return;

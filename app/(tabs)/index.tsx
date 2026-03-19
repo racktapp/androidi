@@ -28,18 +28,12 @@ export default function GroupsScreen() {
     loadUserId();
   }, []);
 
-  useEffect(() => {
-    if (userId) {
-      loadGroups();
-    }
-  }, [userId]);
-
   const loadUserId = async () => {
     const { data: { user } } = await supabase.auth.getUser();
     setUserId(user?.id || null);
   };
 
-  const loadGroups = async () => {
+  const loadGroups = useCallback(async () => {
     if (!userId) return;
     try {
       setError(null);
@@ -51,13 +45,19 @@ export default function GroupsScreen() {
     } finally {
       setIsLoadingInitial(false);
     }
-  };
+  }, [getUserGroups, userId]);
+
+  useEffect(() => {
+    if (userId) {
+      void loadGroups();
+    }
+  }, [userId, loadGroups]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     await loadGroups();
     setRefreshing(false);
-  }, [userId]);
+  }, [loadGroups]);
 
   const filteredGroups = groups.filter(group => 
     group.name.toLowerCase().includes(searchQuery.toLowerCase())

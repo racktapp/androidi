@@ -1,17 +1,16 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable, RefreshControl, ActivityIndicator } from 'react-native';
 import { Image } from 'expo-image';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { useAlert } from '@/template';
+import { getSupabaseClient } from '@/template';
 import { Colors, Typography, BorderRadius, Spacing } from '@/constants/theme';
 import { Button, UserAvatar, UserName } from '@/components';
 import { useGroups } from '@/hooks/useGroups';
 import { useMatches } from '@/hooks/useMatches';
 import { Group, GroupMember, Match } from '@/types';
 import { Sport } from '@/constants/config';
-import { getSupabaseClient } from '@/template';
 import { matchesService } from '@/services/matches';
 import { getUserLabel } from '@/utils/getUserLabel';
 
@@ -21,7 +20,6 @@ export default function GroupDetailScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { showAlert } = useAlert();
   const groupsHook = useGroups();
   const matchesHook = useMatches();
 
@@ -46,24 +44,12 @@ export default function GroupDetailScreen() {
     loadUserId();
   }, []);
 
-  useEffect(() => {
-    if (userId && id) {
-      loadGroupData();
-    }
-  }, [userId, id]);
-
-  useEffect(() => {
-    if (id) {
-      loadLeaderboard();
-    }
-  }, [id, selectedSport, leaderboardPeriod]);
-
   const loadUserId = async () => {
     const { data: { user } } = await supabase.auth.getUser();
     setUserId(user?.id || null);
   };
 
-  const loadGroupData = async () => {
+  const loadGroupData = useCallback(async () => {
     if (!id) return;
 
     setIsInitialLoading(true);
@@ -88,9 +74,9 @@ export default function GroupDetailScreen() {
     } finally {
       setIsInitialLoading(false);
     }
-  };
+  }, [groupsHook, id, matchesHook]);
 
-  const loadLeaderboard = async () => {
+  const loadLeaderboard = useCallback(async () => {
     if (!id) return;
     try {
       const data = await matchesService.getLeaderboard(id, selectedSport, leaderboardPeriod);
@@ -98,7 +84,19 @@ export default function GroupDetailScreen() {
     } catch (err) {
       console.error('Error loading leaderboard:', err);
     }
-  };
+  }, [id, leaderboardPeriod, selectedSport]);
+
+  useEffect(() => {
+    if (userId && id) {
+      void loadGroupData();
+    }
+  }, [id, loadGroupData, userId]);
+
+  useEffect(() => {
+    if (id) {
+      void loadLeaderboard();
+    }
+  }, [id, loadLeaderboard]);
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -242,8 +240,6 @@ export default function GroupDetailScreen() {
       </View>
     );
   }
-
-  const isOwner = group.ownerId === userId;
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>

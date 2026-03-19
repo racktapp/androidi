@@ -1,10 +1,9 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { Image } from 'expo-image';
-import { Colors, Typography, Spacing, BorderRadius } from '@/constants/theme';
+import { Colors } from '@/constants/theme';
 import { Sport, MatchFormat, MatchType } from '@/constants/config';
 import { UserAvatar } from '@/components';
-import { getUserLabel } from '@/utils/getUserLabel';
 
 export interface PosterData {
   sport: Sport;
@@ -17,7 +16,7 @@ export interface PosterData {
   teamBHandle?: string;
   teamAAvatar?: string | null;
   teamBAvatar?: string | null;
-  sets: Array<{ a: number; b: number }>;
+  sets: { a: number; b: number }[];
   winnerSide: 'A' | 'B';
   finalSetsWonA: number;
   finalSetsWonB: number;
@@ -244,6 +243,8 @@ export const MatchPoster = React.forwardRef<View, MatchPosterProps>(
     );
   }
 );
+
+MatchPoster.displayName = 'MatchPoster';
 
 const styles = StyleSheet.create({
   container: {

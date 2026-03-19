@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable, TextInput } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -35,30 +35,12 @@ export default function InvitePlayersScreen() {
     loadUserId();
   }, []);
 
-  useEffect(() => {
-    if (userId && id) {
-      loadData();
-    }
-  }, [userId, id]);
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      if (searchQuery.trim().length > 0) {
-        handleSearch();
-      } else {
-        setSearchResults([]);
-      }
-    }, 300);
-
-    return () => clearTimeout(timer);
-  }, [searchQuery]);
-
   const loadUserId = async () => {
     const { data: { user } } = await supabase.auth.getUser();
     setUserId(user?.id || null);
   };
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     if (!userId || !id || typeof id !== 'string') return;
 
     try {
@@ -76,9 +58,9 @@ export default function InvitePlayersScreen() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [id, userId]);
 
-  const handleSearch = async () => {
+  const handleSearch = useCallback(async () => {
     if (!searchQuery.trim()) return;
 
     setIsSearching(true);
@@ -95,7 +77,25 @@ export default function InvitePlayersScreen() {
     } finally {
       setIsSearching(false);
     }
-  };
+  }, [searchQuery, tournament, userId]);
+
+  useEffect(() => {
+    if (userId && id) {
+      void loadData();
+    }
+  }, [id, loadData, userId]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (searchQuery.trim().length > 0) {
+        void handleSearch();
+      } else {
+        setSearchResults([]);
+      }
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [handleSearch, searchQuery]);
 
   const toggleUser = (userId: string) => {
     const newSet = new Set(selectedUsers);

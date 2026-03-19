@@ -4,12 +4,11 @@ import { Image } from 'expo-image';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { useAlert } from '@/template';
+import { useAlert , getSupabaseClient } from '@/template';
 import { Colors, Typography, BorderRadius, Spacing } from '@/constants/theme';
 import { Button, UserAvatar, UserName, ScreenLoader, EmptyState, ErrorState } from '@/components';
 import { useFriends } from '@/hooks/useFriends';
 import { User, FriendRequest, Friendship } from '@/types';
-import { getSupabaseClient } from '@/template';
 
 const supabase = getSupabaseClient();
 
@@ -41,18 +40,12 @@ export default function FriendsScreen() {
     loadUserId();
   }, []);
 
-  useEffect(() => {
-    if (userId) {
-      loadData();
-    }
-  }, [userId, tab]);
-
   const loadUserId = async () => {
     const { data: { user } } = await supabase.auth.getUser();
     setUserId(user?.id || null);
   };
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     if (!userId) return;
     try {
       setError(null);
@@ -71,13 +64,19 @@ export default function FriendsScreen() {
     } finally {
       setIsLoadingInitial(false);
     }
-  };
+  }, [getFriends, getIncomingRequests, getOutgoingRequests, tab, userId]);
+
+  useEffect(() => {
+    if (userId) {
+      void loadData();
+    }
+  }, [userId, tab, loadData]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     await loadData();
     setRefreshing(false);
-  }, [userId, tab]);
+  }, [loadData]);
 
   const handleSearch = async () => {
     if (!searchQuery.trim()) {

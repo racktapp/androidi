@@ -1,19 +1,18 @@
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable, Modal } from 'react-native';
 import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Colors, Typography, BorderRadius, Spacing } from '@/constants/theme';
-import { Button, LoadingSpinner } from '@/components';
+import { Button, LoadingSpinner , UserAvatar, UserName } from '@/components';
 import { Config, Sport, MatchFormat, MatchType } from '@/constants/config';
 import { useGroups } from '@/hooks/useGroups';
 import { useMatches } from '@/hooks/useMatches';
 import { Group, GroupMember } from '@/types';
 import { getSupabaseClient } from '@/template';
 import { friendsService } from '@/services/friends';
-import { UserAvatar, UserName } from '@/components';
 
 const supabase = getSupabaseClient();
 
@@ -39,7 +38,7 @@ export default function AddMatchScreen() {
   const [type, setType] = useState<MatchType>('competitive');
   const [teamA, setTeamA] = useState<string[]>([]);
   const [teamB, setTeamB] = useState<string[]>([]);
-  const [sets, setSets] = useState<Array<{ teamAScore: number; teamBScore: number }>>([]);
+  const [sets, setSets] = useState<{ teamAScore: number; teamBScore: number }[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -47,27 +46,12 @@ export default function AddMatchScreen() {
     loadUserId();
   }, []);
 
-  useEffect(() => {
-    if (userId) {
-      loadGroups();
-      if (matchMode === '1v1') {
-        loadFriends();
-      }
-    }
-  }, [userId, matchMode]);
-
-  useEffect(() => {
-    if (selectedGroup) {
-      loadMembers();
-    }
-  }, [selectedGroup]);
-
   const loadUserId = async () => {
     const { data: { user } } = await supabase.auth.getUser();
     setUserId(user?.id || null);
   };
 
-  const loadGroups = async () => {
+  const loadGroups = useCallback(async () => {
     if (!userId) return;
     try {
       const data = await getUserGroups(userId);
@@ -77,9 +61,9 @@ export default function AddMatchScreen() {
     } finally {
       setIsLoadingGroups(false);
     }
-  };
+  }, [getUserGroups, userId]);
 
-  const loadFriends = async () => {
+  const loadFriends = useCallback(async () => {
     if (!userId) return;
     setIsLoadingFriends(true);
     try {
@@ -90,9 +74,9 @@ export default function AddMatchScreen() {
     } finally {
       setIsLoadingFriends(false);
     }
-  };
+  }, [userId]);
 
-  const loadMembers = async () => {
+  const loadMembers = useCallback(async () => {
     if (!selectedGroup) return;
     setIsLoadingMembers(true);
     try {
@@ -103,7 +87,22 @@ export default function AddMatchScreen() {
     } finally {
       setIsLoadingMembers(false);
     }
-  };
+  }, [getGroupMembers, selectedGroup]);
+
+  useEffect(() => {
+    if (userId) {
+      void loadGroups();
+      if (matchMode === '1v1') {
+        void loadFriends();
+      }
+    }
+  }, [loadFriends, loadGroups, matchMode, userId]);
+
+  useEffect(() => {
+    if (selectedGroup) {
+      void loadMembers();
+    }
+  }, [loadMembers, selectedGroup]);
 
   const addSet = () => {
     if (sets.length < 3) {
@@ -469,7 +468,7 @@ export default function AddMatchScreen() {
             </Pressable>
           </View>
           {type === 'friendly' && (
-            <Text style={styles.helperText}>Friendly matches won't change levels.</Text>
+            <Text style={styles.helperText}>Friendly matches won&apos;t change levels.</Text>
           )}
         </View>
 

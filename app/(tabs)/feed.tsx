@@ -26,30 +26,12 @@ export default function FeedScreen() {
     loadUserId();
   }, []);
 
-  useEffect(() => {
-    if (userId) {
-      loadInitialData();
-    }
-  }, [userId]);
-
-  const loadInitialData = async () => {
-    try {
-      setError(null);
-      await Promise.all([loadFeed(), loadPendingMatches()]);
-    } catch (err: any) {
-      console.error('Error loading feed:', err);
-      setError(err.message || 'Failed to load feed');
-    } finally {
-      setIsLoadingInitial(false);
-    }
-  };
-
   const loadUserId = async () => {
     const { data: { user } } = await supabase.auth.getUser();
     setUserId(user?.id || null);
   };
 
-  const loadFeed = async () => {
+  const loadFeed = useCallback(async () => {
     if (!userId) return;
     try {
       const data = await userService.getFeed(userId);
@@ -57,9 +39,9 @@ export default function FeedScreen() {
     } catch (err) {
       console.error('Error loading feed:', err);
     }
-  };
+  }, [userId]);
 
-  const loadPendingMatches = async () => {
+  const loadPendingMatches = useCallback(async () => {
     if (!userId) return;
     try {
       // Get matches where user is a player but not the creator
@@ -100,13 +82,31 @@ export default function FeedScreen() {
     } catch (err) {
       console.error('Error loading pending matches:', err);
     }
-  };
+  }, [userId]);
+
+  const loadInitialData = useCallback(async () => {
+    try {
+      setError(null);
+      await Promise.all([loadFeed(), loadPendingMatches()]);
+    } catch (err: any) {
+      console.error('Error loading feed:', err);
+      setError(err.message || 'Failed to load feed');
+    } finally {
+      setIsLoadingInitial(false);
+    }
+  }, [loadFeed, loadPendingMatches]);
+
+  useEffect(() => {
+    if (userId) {
+      void loadInitialData();
+    }
+  }, [userId, loadInitialData]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     await Promise.all([loadFeed(), loadPendingMatches()]);
     setRefreshing(false);
-  }, [userId]);
+  }, [loadFeed, loadPendingMatches]);
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);

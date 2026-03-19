@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, Pressable, Switch } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
-import { Colors, Typography, BorderRadius, Spacing } from '@/constants/theme';
+import { Colors, Typography, Spacing } from '@/constants/theme';
 
 interface SettingsRowProps {
   icon?: keyof typeof MaterialIcons.glyphMap;

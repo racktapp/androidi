@@ -1,15 +1,13 @@
 
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable, Alert, Linking } from 'react-native';
-import { Image } from 'expo-image';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { useAlert } from '@/template';
+import { useAlert , getSupabaseClient } from '@/template';
 import { Colors, Typography, BorderRadius, Spacing } from '@/constants/theme';
-import { UserAvatar, UserName, Button, LoadingSpinner } from '@/components';
+import { UserAvatar, UserName, LoadingSpinner } from '@/components';
 import { SettingsRow, SettingsSection } from '@/components/settings';
-import { getSupabaseClient } from '@/template';
 
 import { userService } from '@/services/user';
 import * as ExpoApplication from 'expo-application';

@@ -1,5 +1,7 @@
 # Group Creation Fix - Manual Test Checklist
 
+> Status note: this checklist is still manual-only. Automation now covers lint, release smoke checks, manifest trimming, and release-signing safeguards, but the scenarios below still require human validation on a real build.
+
 ## Critical Tests (Must Pass)
 
 ### Test 1: New Group Creation

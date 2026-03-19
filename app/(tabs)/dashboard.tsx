@@ -7,10 +7,9 @@ import { useRouter } from 'expo-router';
 import { Colors, Typography, BorderRadius, Spacing } from '@/constants/theme';
 import { ScreenLoader, EmptyState, ErrorState } from '@/components';
 import { getSupabaseClient } from '@/template';
-import { userService } from '@/services/user';
 import { tournamentsService } from '@/services/tournaments';
 import { Tournament } from '@/types';
-import { normalizeMatchSets, calculateSetsWon } from '@/services/matchUtils';
+import { normalizeMatchSets } from '@/services/matchUtils';
 import TournamentsHome from '../tournaments/index';
 
 const supabase = getSupabaseClient();
@@ -74,16 +73,6 @@ const getPlayerLabel = (user: any, fallback = 'Unknown'): string =>
   asNonEmptyString(user?.displayName, '') ||
   asNonEmptyString(user?.username, fallback);
 
-const getPlayerShortLabel = (user: any, fallback = 'Player'): string => {
-  const preferredName = asNonEmptyString(user?.display_name, '') || asNonEmptyString(user?.displayName, '');
-
-  if (preferredName) {
-    return preferredName.split(' ')[0];
-  }
-
-  return asNonEmptyString(user?.username, fallback);
-};
-
 const getTournamentTitle = (title: unknown): string => asNonEmptyString(title, 'Untitled tournament');
 
 const getTournamentParticipantCount = (participants: unknown): number => asArray(participants).length;
@@ -103,8 +92,6 @@ export default function DashboardScreen() {
   const [userId, setUserId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<TabType>('overview');
   const [unreadFeedCount, setUnreadFeedCount] = useState<number>(0);
-  const [events, setEvents] = useState<any[]>([]);
-  const [pendingMatches] = useState<any[]>([]);
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [lastActiveGroup, setLastActiveGroup] = useState<DashboardGroupSummary | null>(null);
   const [recentResults, setRecentResults] = useState<DashboardRecentResult[]>([]);
@@ -119,12 +106,6 @@ export default function DashboardScreen() {
     loadUserId();
   }, []);
 
-  useEffect(() => {
-    if (userId) {
-      loadInitialData();
-    }
-  }, [userId, activeTab]);
-
   const loadUserId = async () => {
     try {
       const {
@@ -138,37 +119,7 @@ export default function DashboardScreen() {
     }
   };
 
-  const loadInitialData = async () => {
-    try {
-      setError(null);
-      const pendingCountPromise = userId
-        ? loadPendingMatchesCount().then(setUnreadFeedCount)
-        : Promise.resolve();
-
-      if (activeTab === 'overview') {
-        await Promise.all([loadOverviewData(), pendingCountPromise]);
-      } else {
-        await pendingCountPromise;
-      }
-    } catch (err: any) {
-      console.error('Error loading dashboard:', err);
-      setError(err.message || 'Failed to load dashboard');
-    } finally {
-      setIsLoadingInitial(false);
-    }
-  };
-
-  const loadFeed = async () => {
-    if (!userId) return;
-    try {
-      const data = await userService.getFeed(userId);
-      setEvents(data);
-    } catch (err) {
-      console.error('Error loading feed:', err);
-    }
-  };
-
-  const loadPendingMatchesCount = async (): Promise<number> => {
+  const loadPendingMatchesCount = useCallback(async (): Promise<number> => {
     if (!userId) return 0;
     try {
       const { data: matchPlayers } = await supabase
@@ -192,9 +143,9 @@ export default function DashboardScreen() {
       console.error('Error loading pending matches count:', err);
       return 0;
     }
-  };
+  }, [userId]);
 
-  const loadOverviewData = async () => {
+  const loadOverviewData = useCallback(async () => {
     if (!userId) return;
     try {
       // Get this month's stats
@@ -240,7 +191,6 @@ export default function DashboardScreen() {
         matchesPlayed: thisMonthMatches.length,
       });
 
-      // Get last active group
       if (thisMonthMatches.length > 0) {
         const lastMatch = thisMonthMatches[thisMonthMatches.length - 1];
         const lastMatchData = unwrapRelation(lastMatch.match);
@@ -262,7 +212,6 @@ export default function DashboardScreen() {
         setLastActiveGroup(null);
       }
 
-      // Get recent competitive results (last 3)
       const recentMatches = normalizedMatchPlayers
         .filter((matchPlayer) => matchPlayer.match.status === 'confirmed' && matchPlayer.match.type === 'competitive')
         .sort(
@@ -317,10 +266,9 @@ export default function DashboardScreen() {
         resultsWithDetails.filter((result): result is DashboardRecentResult => Boolean(result))
       );
 
-      // Get tournament summary
       const activeTourn = await tournamentsService.getActiveTournamentForUser(userId);
       setActiveTournament(activeTourn);
-      
+
       if (activeTourn) {
         const progress = await tournamentsService.getTournamentProgress(activeTourn);
         setTournamentProgress(progress);
@@ -331,7 +279,6 @@ export default function DashboardScreen() {
       const recentTourns = await tournamentsService.getRecentCompletedTournamentsForUser(userId, 3);
       setRecentTournaments(recentTourns);
       setError(null);
-
     } catch (err: any) {
       console.error('Error loading overview:', err);
       setStats(null);
@@ -342,179 +289,39 @@ export default function DashboardScreen() {
       setRecentTournaments([]);
       setError(err?.message || 'Failed to load dashboard');
     }
-  };
+  }, [userId]);
+
+  const loadInitialData = useCallback(async () => {
+    try {
+      setError(null);
+      const pendingCountPromise = userId
+        ? loadPendingMatchesCount().then(setUnreadFeedCount)
+        : Promise.resolve();
+
+      if (activeTab === 'overview') {
+        await Promise.all([loadOverviewData(), pendingCountPromise]);
+      } else {
+        await pendingCountPromise;
+      }
+    } catch (err: any) {
+      console.error('Error loading dashboard:', err);
+      setError(err.message || 'Failed to load dashboard');
+    } finally {
+      setIsLoadingInitial(false);
+    }
+  }, [activeTab, loadOverviewData, loadPendingMatchesCount, userId]);
+
+  useEffect(() => {
+    if (userId) {
+      void loadInitialData();
+    }
+  }, [activeTab, loadInitialData, userId]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     await loadInitialData();
     setRefreshing(false);
-  }, [userId, activeTab]);
-
-  const formatDate = (dateString: string) => {
-    if (!isValidDateValue(dateString)) {
-      return 'Recently';
-    }
-
-    const date = new Date(dateString);
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMs / 3600000);
-    const diffDays = Math.floor(diffMs / 86400000);
-
-    if (diffMins < 0 || diffHours < 0 || diffDays < 0) return 'Recently';
-    if (diffMins < 60) return `${diffMins}m ago`;
-    if (diffHours < 24) return `${diffHours}h ago`;
-    if (diffDays === 0) return 'Today';
-    if (diffDays === 1) return 'Yesterday';
-    return date.toLocaleDateString();
-  };
-
-  const renderEvent = (event: any) => {
-    let icon = '📢';
-    let description = '';
-
-    const groupName =
-      asNonEmptyString(event?.group?.name, '') ||
-      asNonEmptyString(event?.metadata?.group_name, 'a group');
-    const userName = getPlayerLabel(event?.user, 'Someone');
-
-    if (!event.group?.name && event.group_id) {
-      console.warn('[Feed] Missing group name for event:', {
-        eventId: event.id,
-        eventType: event.event_type,
-        groupId: event.group_id,
-      });
-    }
-
-    switch (event.event_type) {
-      case 'match_confirmed':
-        icon = '🎾';
-        description = `Match confirmed in ${groupName}`;
-        break;
-      case 'group_created':
-        icon = '🏆';
-        description = `${userName} created ${groupName}`;
-        break;
-      case 'group_joined':
-        icon = '👋';
-        description = `${userName} joined ${groupName}`;
-        break;
-      default:
-        icon = '📢';
-        description = 'Activity update';
-    }
-
-    return (
-      <View key={event.id} style={styles.eventCard}>
-        <Text style={styles.eventIcon}>{icon}</Text>
-        <View style={styles.eventContent}>
-          <Text style={styles.eventDescription}>{description}</Text>
-          <Text style={styles.eventTime}>{formatDate(event.created_at)}</Text>
-        </View>
-      </View>
-    );
-  };
-
-  const renderFeedTab = () => (
-    <ScrollView
-      style={styles.scrollView}
-      contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 80 }]}
-      showsVerticalScrollIndicator={false}
-      refreshControl={
-        <RefreshControl
-          refreshing={refreshing}
-          onRefresh={onRefresh}
-          tintColor={Colors.primary}
-        />
-      }
-    >
-      {/* Pending Confirmations */}
-      {pendingMatches.length > 0 && (
-        <View style={styles.pendingSection}>
-          <Text style={styles.sectionTitle}>Needs Your Confirmation</Text>
-          {pendingMatches.map((match) => {
-            const sets = normalizeMatchSets(match);
-            const { setsWonA, setsWonB } = calculateSetsWon(sets);
-            const teamAPlayers = asArray<any>(match?.players).filter((player) => player?.team === 'A');
-            const teamBPlayers = asArray<any>(match?.players).filter((player) => player?.team === 'B');
-
-            const getTeamName = (players: any[]) => {
-              const names = players
-                .map((player: any) => getPlayerShortLabel(player?.user, 'Player'))
-                .filter(Boolean);
-
-              return names.length > 0 ? names.join(' / ') : 'Players';
-            };
-
-            return (
-              <Pressable
-                key={match.id}
-                style={styles.pendingCard}
-                onPress={() => router.push(`/match/${match.id}`)}
-              >
-                <View style={styles.pendingHeader}>
-                  <MaterialIcons name="sports-tennis" size={20} color={Colors.primary} />
-                  <Text style={styles.pendingGroup}>
-                    {asNonEmptyString(match?.group?.name, 'Match')}
-                  </Text>
-                </View>
-
-                <View style={styles.matchupRow}>
-                  <Text style={styles.teamName} numberOfLines={1}>
-                    {getTeamName(teamAPlayers)}
-                  </Text>
-                  <Text style={styles.vsText}>vs</Text>
-                  <Text style={styles.teamName} numberOfLines={1}>
-                    {getTeamName(teamBPlayers)}
-                  </Text>
-                </View>
-
-                {sets.length > 0 && (
-                  <View style={styles.scorePreview}>
-                    {sets.map((set, idx) => (
-                      <Text key={idx} style={styles.setScore}>
-                        {set.a}–{set.b}
-                      </Text>
-                    ))}
-                    <Text style={styles.setsWon}>
-                      ({setsWonA}–{setsWonB})
-                    </Text>
-                  </View>
-                )}
-
-                <View style={styles.pendingFooter}>
-                  <View style={styles.pendingBadge}>
-                    <MaterialIcons name="schedule" size={14} color={Colors.warning} />
-                    <Text style={styles.pendingBadgeText}>Awaiting Confirmation</Text>
-                  </View>
-                  <MaterialIcons name="chevron-right" size={20} color={Colors.textMuted} />
-                </View>
-              </Pressable>
-            );
-          })}
-        </View>
-      )}
-
-      {/* Activity Feed */}
-      {events.length === 0 && pendingMatches.length === 0 ? (
-        <EmptyState
-          icon="📡"
-          title="No Activity Yet"
-          subtitle="Add friends and join groups to see activity"
-        />
-      ) : events.length > 0 ? (
-        <View style={styles.eventsSection}>
-          {pendingMatches.length > 0 && (
-            <Text style={styles.sectionTitle}>Recent Activity</Text>
-          )}
-          <View style={styles.eventsList}>
-            {events.map(renderEvent)}
-          </View>
-        </View>
-      ) : null}
-    </ScrollView>
-  );
+  }, [loadInitialData]);
 
   const renderOverviewTab = () => (
     <ScrollView

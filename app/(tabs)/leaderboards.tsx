@@ -5,7 +5,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Colors, Typography, BorderRadius, Spacing } from '@/constants/theme';
-import { UserAvatar, UserName, ScreenLoader, EmptyState, ErrorState, LoadingSpinner } from '@/components';
+import { UserAvatar, UserName, ScreenLoader, EmptyState, LoadingSpinner } from '@/components';
 import { useGroups } from '@/hooks/useGroups';
 import { Group, LeaderboardEntry } from '@/types';
 import { Sport } from '@/constants/config';
@@ -31,7 +31,6 @@ export default function LeaderboardsScreen() {
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [isLoadingInitial, setIsLoadingInitial] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   const [friends, setFriends] = useState<any[]>([]);
   const [selectedOpponent, setSelectedOpponent] = useState<string | null>(null);
@@ -44,40 +43,21 @@ export default function LeaderboardsScreen() {
     loadUserId();
   }, []);
 
-  useEffect(() => {
-    if (userId) {
-      loadGroups();
-      loadFriends();
-    }
-  }, [userId]);
-
-  useEffect(() => {
-    if (selectedGroup && activeTab === 'group-ranking') {
-      loadLeaderboard();
-    }
-  }, [selectedGroup, selectedSport, period, activeTab]);
-
-  useEffect(() => {
-    if (selectedOpponent && activeTab === 'head-to-head') {
-      loadHeadToHeadStats();
-    }
-  }, [selectedOpponent, selectedSport, period, activeTab]);
-
   const loadUserId = async () => {
     const { data: { user } } = await supabase.auth.getUser();
     setUserId(user?.id || null);
   };
 
-  const loadGroups = async () => {
+  const loadGroups = useCallback(async () => {
     if (!userId) return;
     const data = await getUserGroups(userId);
     setGroups(data);
     if (data.length > 0 && !selectedGroup) {
       setSelectedGroup(data[0].id);
     }
-  };
+  }, [getUserGroups, selectedGroup, userId]);
 
-  const loadFriends = async () => {
+  const loadFriends = useCallback(async () => {
     if (!userId) return;
     try {
       const data = await friendsService.getFriends(userId);
@@ -85,23 +65,21 @@ export default function LeaderboardsScreen() {
     } catch (err) {
       console.error('Error loading friends:', err);
     }
-  };
+  }, [userId]);
 
-  const loadLeaderboard = async () => {
+  const loadLeaderboard = useCallback(async () => {
     if (!selectedGroup) return;
     try {
-      setError(null);
       const data = await matchesService.getLeaderboard(selectedGroup, selectedSport, period);
       setLeaderboard(data);
     } catch (err: any) {
       console.error('Error loading leaderboard:', err);
-      setError(err.message || 'Failed to load leaderboard');
     } finally {
       setIsLoadingInitial(false);
     }
-  };
+  }, [period, selectedGroup, selectedSport]);
 
-  const loadHeadToHeadStats = async () => {
+  const loadHeadToHeadStats = useCallback(async () => {
     if (!userId || !selectedOpponent) return;
 
     setLoadingStats(true);
@@ -211,7 +189,26 @@ export default function LeaderboardsScreen() {
     } finally {
       setLoadingStats(false);
     }
-  };
+  }, [period, selectedOpponent, selectedSport, userId]);
+
+  useEffect(() => {
+    if (userId) {
+      void loadGroups();
+      void loadFriends();
+    }
+  }, [loadFriends, loadGroups, userId]);
+
+  useEffect(() => {
+    if (selectedGroup && activeTab === 'group-ranking') {
+      void loadLeaderboard();
+    }
+  }, [activeTab, loadLeaderboard, selectedGroup, selectedSport, period]);
+
+  useEffect(() => {
+    if (selectedOpponent && activeTab === 'head-to-head') {
+      void loadHeadToHeadStats();
+    }
+  }, [activeTab, loadHeadToHeadStats, period, selectedOpponent, selectedSport]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -221,7 +218,7 @@ export default function LeaderboardsScreen() {
       await loadHeadToHeadStats();
     }
     setRefreshing(false);
-  }, [selectedGroup, selectedSport, period, selectedOpponent, activeTab]);
+  }, [activeTab, loadHeadToHeadStats, loadLeaderboard]);
 
   const handleRowPress = (entry: LeaderboardEntry) => {
     if (!selectedGroup) return;
