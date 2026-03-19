@@ -50,7 +50,7 @@ export default function HowRatingsWorkScreen() {
             Your reliability score shows how established your rating is. More matches = higher reliability = smaller rating changes.
           </Text>
           <Text style={styles.paragraph}>
-            New players have larger rating swings; experienced players' ratings are more stable.
+            New players have larger rating swings; experienced players&apos; ratings are more stable.
           </Text>
         </View>
 

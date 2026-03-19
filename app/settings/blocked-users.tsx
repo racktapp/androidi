@@ -1,12 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { useAlert } from '@/template';
+import { useAlert , getSupabaseClient } from '@/template';
 import { Colors, Typography, BorderRadius, Spacing } from '@/constants/theme';
 import { UserAvatar, UserName, LoadingSpinner, EmptyState } from '@/components';
-import { getSupabaseClient } from '@/template';
 import { preferencesService } from '@/services/preferences';
 
 const supabase = getSupabaseClient();
@@ -24,18 +23,12 @@ export default function BlockedUsersScreen() {
     loadUserId();
   }, []);
 
-  useEffect(() => {
-    if (userId) {
-      loadBlockedUsers();
-    }
-  }, [userId]);
-
   const loadUserId = async () => {
     const { data: { user } } = await supabase.auth.getUser();
     setUserId(user?.id || null);
   };
 
-  const loadBlockedUsers = async () => {
+  const loadBlockedUsers = useCallback(async () => {
     if (!userId) return;
 
     try {
@@ -46,7 +39,13 @@ export default function BlockedUsersScreen() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [userId]);
+
+  useEffect(() => {
+    if (userId) {
+      void loadBlockedUsers();
+    }
+  }, [loadBlockedUsers, userId]);
 
   const handleUnblock = async (blockedUserId: string) => {
     if (!userId) return;
@@ -55,8 +54,9 @@ export default function BlockedUsersScreen() {
       await preferencesService.unblockUser(userId, blockedUserId);
       showAlert('Success', 'User unblocked');
       loadBlockedUsers();
-    } catch (err: any) {
+    } catch (error: any) {
       showAlert('Error', 'Failed to unblock user');
+      console.error('Error unblocking user:', error);
     }
   };
 

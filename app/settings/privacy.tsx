@@ -1,13 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { useAlert } from '@/template';
-import { Colors, Typography, BorderRadius, Spacing } from '@/constants/theme';
+import { useAlert , getSupabaseClient } from '@/template';
+import { Colors, Typography, Spacing } from '@/constants/theme';
 import { SettingsRow, SettingsSection } from '@/components/settings';
 import { LoadingSpinner } from '@/components';
-import { getSupabaseClient } from '@/template';
 import { preferencesService } from '@/services/preferences';
 
 const supabase = getSupabaseClient();
@@ -29,18 +28,12 @@ export default function PrivacyScreen() {
     loadUserId();
   }, []);
 
-  useEffect(() => {
-    if (userId) {
-      loadPreferences();
-    }
-  }, [userId]);
-
   const loadUserId = async () => {
     const { data: { user } } = await supabase.auth.getUser();
     setUserId(user?.id || null);
   };
 
-  const loadPreferences = async () => {
+  const loadPreferences = useCallback(async () => {
     if (!userId) return;
 
     try {
@@ -52,7 +45,13 @@ export default function PrivacyScreen() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [userId]);
+
+  useEffect(() => {
+    if (userId) {
+      void loadPreferences();
+    }
+  }, [loadPreferences, userId]);
 
   const updateVisibility = async (value: ProfileVisibility) => {
     if (!userId) return;

@@ -1,16 +1,15 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable, Alert, Platform } from 'react-native';
+import React, { useState, useEffect, useCallback } from 'react';
+import { View, Text, StyleSheet, ScrollView, Pressable } from 'react-native';
 import { Image } from 'expo-image';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { useAlert } from '@/template';
+import { useAlert , getSupabaseClient } from '@/template';
 import { Colors, Typography, BorderRadius, Spacing } from '@/constants/theme';
 import { Button, MatchPoster, LoadingSpinner, UserName } from '@/components';
 import type { PosterData } from '@/components';
 import { useMatches } from '@/hooks/useMatches';
 import { Match } from '@/types';
-import { getSupabaseClient } from '@/template';
 import { captureRef } from 'react-native-view-shot';
 import * as Sharing from 'expo-sharing';
 import * as FileSystem from 'expo-file-system';
@@ -36,22 +35,22 @@ export default function MatchDetailScreen() {
     loadUserId();
   }, []);
 
-  useEffect(() => {
-    if (id) {
-      loadMatch();
-    }
-  }, [id]);
-
   const loadUserId = async () => {
     const { data: { user } } = await supabase.auth.getUser();
     setUserId(user?.id || null);
   };
 
-  const loadMatch = async () => {
+  const loadMatch = useCallback(async () => {
     if (!id) return;
     const data = await getMatchById(id);
     setMatch(data);
-  };
+  }, [getMatchById, id]);
+
+  useEffect(() => {
+    if (id) {
+      void loadMatch();
+    }
+  }, [id, loadMatch]);
 
   const handleConfirm = async () => {
     if (!id || !userId) return;

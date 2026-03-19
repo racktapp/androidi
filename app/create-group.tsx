@@ -1,11 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable, TextInput } from 'react-native';
 import { Image } from 'expo-image';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { Colors, Typography, BorderRadius, Spacing } from '@/constants/theme';
-import { Input, Button, Avatar, LoadingSpinner, UserAvatar } from '@/components';
+import { LoadingSpinner, UserAvatar } from '@/components';
 import { Sport } from '@/constants/config';
 import { useGroups } from '@/hooks/useGroups';
 import { useFriends } from '@/hooks/useFriends';
@@ -34,18 +34,12 @@ export default function CreateGroupScreen() {
     loadUserId();
   }, []);
 
-  useEffect(() => {
-    if (userId) {
-      loadFriends();
-    }
-  }, [userId]);
-
   const loadUserId = async () => {
     const { data: { user } } = await supabase.auth.getUser();
     setUserId(user?.id || null);
   };
 
-  const loadFriends = async () => {
+  const loadFriends = useCallback(async () => {
     if (!userId) return;
     try {
       const data = await getFriends(userId);
@@ -55,7 +49,13 @@ export default function CreateGroupScreen() {
     } finally {
       setIsLoadingFriends(false);
     }
-  };
+  }, [getFriends, userId]);
+
+  useEffect(() => {
+    if (userId) {
+      void loadFriends();
+    }
+  }, [loadFriends, userId]);
 
   const toggleFriend = (friendId: string) => {
     if (selectedFriends.includes(friendId)) {

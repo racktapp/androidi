@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import { Platform, StyleSheet, View } from 'react-native';
+import { BannerAd as NativeBannerAd, BannerAdSize, TestIds } from 'react-native-google-mobile-ads';
 import { logStartup } from '@/utils/startupDiagnostics';
 
 const PROD_BANNER_IDS: Record<'ios' | 'android', string> = {
@@ -14,12 +15,10 @@ export function AdMobBanner() {
     }
 
     try {
-      // Use string concatenation to prevent Metro's static analysis from resolving this on web
-      const module = require('react-native-google-mobile-' + 'ads');
       return {
-        BannerAd: module.BannerAd as React.ComponentType<any>,
-        BannerAdSize: module.BannerAdSize,
-        TestIds: module.TestIds,
+        BannerAd: NativeBannerAd as React.ComponentType<any>,
+        BannerAdSize,
+        TestIds,
       };
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown module load error';

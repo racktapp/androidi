@@ -1,10 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable, TextInput } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Colors, Typography, BorderRadius, Spacing } from '@/constants/theme';
-import { Button, UserName, LoadingSpinner } from '@/components';
+import { Button, LoadingSpinner } from '@/components';
 import { tournamentsService } from '@/services/tournaments';
 import { TournamentMatch } from '@/types';
 import { useAlert } from '@/template';
@@ -21,11 +21,7 @@ export default function AmericanoPointsScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
 
-  useEffect(() => {
-    loadMatch();
-  }, [matchId]);
-
-  const loadMatch = async () => {
+  const loadMatch = useCallback(async () => {
     if (!matchId || typeof matchId !== 'string') return;
 
     try {
@@ -44,7 +40,11 @@ export default function AmericanoPointsScreen() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [matchId]);
+
+  useEffect(() => {
+    void loadMatch();
+  }, [loadMatch]);
 
   const handleSubmit = async () => {
     const ptsA = parseInt(pointsA) || 0;

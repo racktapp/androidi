@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator } from 'react-native';
 import { Image } from 'expo-image';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -6,7 +6,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Colors, Typography, BorderRadius, Spacing } from '@/constants/theme';
 import { getSupabaseClient } from '@/template';
-import { matchesService } from '@/services/matches';
 import { Sport } from '@/constants/config';
 
 const supabase = getSupabaseClient();
@@ -51,11 +50,7 @@ export default function ProfileScreen() {
   const [recentMatches, setRecentMatches] = useState<RecentMatch[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    loadData();
-  }, [userId, groupId, sport, period]);
-
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     if (!userId || !groupId || !sport) return;
 
     try {
@@ -193,7 +188,11 @@ export default function ProfileScreen() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [groupId, period, sport, userId]);
+
+  useEffect(() => {
+    void loadData();
+  }, [loadData]);
 
   const renderTrendChart = () => {
     if (ratingHistory.length < 2) {
@@ -312,7 +311,7 @@ export default function ProfileScreen() {
 
         {/* Level Trend Card */}
         <View style={styles.trendCard}>
-          <Text style={styles.trendLabel}>LEVEL TREND</Text>
+          <Text style={styles.trendHeading}>LEVEL TREND</Text>
           {renderTrendChart()}
         </View>
 
@@ -494,7 +493,7 @@ const styles = StyleSheet.create({
     borderColor: Colors.border,
     padding: Spacing.lg,
   },
-  trendLabel: {
+  trendHeading: {
     fontSize: Typography.sizes.xs,
     fontWeight: Typography.weights.bold,
     color: Colors.textMuted,

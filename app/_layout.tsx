@@ -3,7 +3,7 @@ import { ActivityIndicator, DevSettings, StyleSheet, Text, View } from 'react-na
 import { Stack, type ErrorBoundaryProps } from 'expo-router';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AlertProvider } from '@/template';
-import { initAdMob } from '@/utils/admob';
+import { initAdMob } from '../utils/admob';
 import { Colors } from '@/constants/theme';
 import { StartupErrorScreen } from '@/components/StartupErrorScreen';
 import { logStartup, logStartupError } from '@/utils/startupDiagnostics';

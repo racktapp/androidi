@@ -1,5 +1,18 @@
 # Rackt V1 Testing Checklist
 
+## Automated Validation Status
+
+These checks are validated directly in-repo and can be re-run in CI/local development:
+
+- [x] `CI=1 npx expo lint`
+- [x] `npm run smoke:release`
+- [x] Android release config no longer falls back to the debug keystore
+- [x] Shipped Android manifest is trimmed to the permission(s) required by the current app behavior
+
+## Still Requires Manual Verification
+
+The remaining sections below are intentionally left as manual QA items. Do not mark them complete unless they are exercised on a real build/environment.
+
 ## Authentication Flow
 
 ### New User Journey
@@ -162,10 +175,11 @@
 
 ## Pass Criteria
 
-✅ All checklist items must pass
-✅ No silent failures anywhere in the flow
-✅ All database writes are atomic
-✅ Clear error messages for all failure scenarios
-✅ Midnight Blue theme consistent across all screens
-✅ Manual rank entry validates and clamps correctly
-✅ Returning users skip onboarding and go directly to tabs
+- [x] Automated validation section passes in local/CI runs
+- [ ] All manual checklist items below have been executed on a production-like build
+- [ ] No silent failures anywhere in the flow
+- [ ] All database writes are atomic
+- [ ] Clear error messages for all failure scenarios
+- [ ] Midnight Blue theme consistent across all screens
+- [ ] Manual rank entry validates and clamps correctly
+- [ ] Returning users skip onboarding and go directly to tabs

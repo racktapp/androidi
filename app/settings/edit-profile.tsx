@@ -1,12 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable, TextInput } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { useAlert } from '@/template';
+import { useAlert , getSupabaseClient } from '@/template';
 import { Colors, Typography, BorderRadius, Spacing } from '@/constants/theme';
 import { Button, LoadingSpinner } from '@/components';
-import { getSupabaseClient } from '@/template';
 
 const supabase = getSupabaseClient();
 
@@ -24,22 +23,7 @@ export default function EditProfileScreen() {
   const [usernameAvailable, setUsernameAvailable] = useState(true);
   const [originalUsername, setOriginalUsername] = useState('');
 
-  useEffect(() => {
-    loadProfile();
-  }, []);
-
-  useEffect(() => {
-    if (username && username !== originalUsername) {
-      const timer = setTimeout(() => {
-        checkUsernameAvailability();
-      }, 500);
-      return () => clearTimeout(timer);
-    } else {
-      setUsernameAvailable(true);
-    }
-  }, [username]);
-
-  const loadProfile = async () => {
+  const loadProfile = useCallback(async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
@@ -56,32 +40,47 @@ export default function EditProfileScreen() {
         setOriginalUsername(profile.username || '');
         setEmail(profile.email || '');
       }
-    } catch (err) {
-      console.error('Error loading profile:', err);
+    } catch (error) {
+      console.error('Error loading profile:', error);
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  const checkUsernameAvailability = async () => {
+  const checkUsernameAvailability = useCallback(async () => {
     if (!username || username === originalUsername) return;
 
     setCheckingUsername(true);
     try {
-      const { data, error } = await supabase
+      const { data } = await supabase
         .from('user_profiles')
         .select('id')
         .eq('username', username.toLowerCase())
         .single();
 
       setUsernameAvailable(!data);
-    } catch (err) {
+    } catch {
       // No user found = available
       setUsernameAvailable(true);
     } finally {
       setCheckingUsername(false);
     }
-  };
+  }, [originalUsername, username]);
+
+  useEffect(() => {
+    void loadProfile();
+  }, [loadProfile]);
+
+  useEffect(() => {
+    if (username && username !== originalUsername) {
+      const timer = setTimeout(() => {
+        void checkUsernameAvailability();
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+
+    setUsernameAvailable(true);
+  }, [checkUsernameAvailability, originalUsername, username]);
 
   const handleSave = async () => {
     if (!displayName.trim()) {

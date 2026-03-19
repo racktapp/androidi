@@ -1,10 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Colors, Typography, BorderRadius, Spacing } from '@/constants/theme';
-import { Button, UserName, LoadingSpinner } from '@/components';
+import { Button, LoadingSpinner } from '@/components';
 import { tournamentsService } from '@/services/tournaments';
 import { TournamentMatch } from '@/types';
 import { useAlert } from '@/template';
@@ -16,15 +16,11 @@ export default function MatchScoreScreen() {
   const { showAlert } = useAlert();
 
   const [match, setMatch] = useState<TournamentMatch | null>(null);
-  const [sets, setSets] = useState<Array<{ a: number; b: number }>>([{ a: 0, b: 0 }]);
+  const [sets, setSets] = useState<{ a: number; b: number }[]>([{ a: 0, b: 0 }]);
   const [isLoading, setIsLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
 
-  useEffect(() => {
-    loadMatch();
-  }, [matchId]);
-
-  const loadMatch = async () => {
+  const loadMatch = useCallback(async () => {
     if (!matchId || typeof matchId !== 'string') return;
 
     try {
@@ -42,7 +38,11 @@ export default function MatchScoreScreen() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [matchId]);
+
+  useEffect(() => {
+    void loadMatch();
+  }, [loadMatch]);
 
   const updateScore = (setIndex: number, team: 'a' | 'b', value: number) => {
     const newSets = [...sets];

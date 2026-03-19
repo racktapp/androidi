@@ -81,6 +81,31 @@ def enableProguardInReleaseBuilds = (findProperty('android.enableProguardInRelea
  */
 def jscFlavor = 'io.github.react-native-community:jsc-android:2026004.+'
 
+def getReleaseSigningValue = { String key ->
+    def gradleValue = findProperty(key)
+    if (gradleValue != null && gradleValue.toString().trim()) {
+        return gradleValue.toString().trim()
+    }
+
+    def envValue = System.getenv(key)
+    if (envValue != null && envValue.toString().trim()) {
+        return envValue.toString().trim()
+    }
+
+    return null
+}
+
+def releaseStoreFilePath = getReleaseSigningValue('ANDROID_UPLOAD_STORE_FILE')
+def releaseStorePassword = getReleaseSigningValue('ANDROID_UPLOAD_STORE_PASSWORD')
+def releaseKeyAlias = getReleaseSigningValue('ANDROID_UPLOAD_KEY_ALIAS')
+def releaseKeyPassword = getReleaseSigningValue('ANDROID_UPLOAD_KEY_PASSWORD')
+def hasReleaseSigning = [
+    releaseStoreFilePath,
+    releaseStorePassword,
+    releaseKeyAlias,
+    releaseKeyPassword,
+].every { value -> value != null && value.length() > 0 }
+
 android {
     ndkVersion rootProject.ext.ndkVersion
 
@@ -102,15 +127,27 @@ android {
             keyAlias 'androiddebugkey'
             keyPassword 'android'
         }
+        if (hasReleaseSigning) {
+            release {
+                storeFile file(releaseStoreFilePath)
+                storePassword releaseStorePassword
+                keyAlias releaseKeyAlias
+                keyPassword releaseKeyPassword
+            }
+        }
     }
     buildTypes {
         debug {
             signingConfig signingConfigs.debug
         }
         release {
-            // Caution! In production, you need to generate your own keystore file.
-            // see https://reactnative.dev/docs/signed-apk-android.
-            signingConfig signingConfigs.debug
+            // Production signing is only applied when release credentials are provided
+            // via Gradle properties or environment variables (for example EAS-managed
+            // credentials or a local upload keystore). We intentionally avoid falling
+            // back to the debug keystore for release builds.
+            if (hasReleaseSigning) {
+                signingConfig signingConfigs.release
+            }
             shrinkResources (findProperty('android.enableShrinkResourcesInReleaseBuilds')?.toBoolean() ?: false)
             minifyEnabled enableProguardInReleaseBuilds
             proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"

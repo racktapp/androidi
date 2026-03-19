@@ -1,14 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable, TextInput } from 'react-native';
 import { Image } from 'expo-image';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { useAlert } from '@/template';
+import { useAlert , getSupabaseClient } from '@/template';
 import { Colors, Typography, BorderRadius, Spacing } from '@/constants/theme';
 import { Button } from '@/components';
 import { Sport, Config } from '@/constants/config';
-import { getSupabaseClient } from '@/template';
 
 const supabase = getSupabaseClient();
 
@@ -44,12 +43,6 @@ export default function EditLevelScreen() {
   }, []);
 
   useEffect(() => {
-    if (userId) {
-      loadRatings();
-    }
-  }, [userId]);
-
-  useEffect(() => {
     // When sport changes, update level from that sport's rating
     const sportRating = ratings[selectedSport];
     if (sportRating) {
@@ -63,7 +56,7 @@ export default function EditLevelScreen() {
     setUserId(user?.id || null);
   };
 
-  const loadRatings = async () => {
+  const loadRatings = useCallback(async () => {
     if (!userId) return;
     
     setLoading(true);
@@ -108,7 +101,13 @@ export default function EditLevelScreen() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [userId]);
+
+  useEffect(() => {
+    if (userId) {
+      void loadRatings();
+    }
+  }, [loadRatings, userId]);
 
   const getLevelForChoice = (choice: 'beginner' | 'intermediate' | 'advanced') => {
     return Config.onboardingLevels[choice];
