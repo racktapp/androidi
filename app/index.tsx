@@ -3,6 +3,7 @@ import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import { getSupabaseClient } from '@/template';
 import { logStartup, logStartupError } from '@/utils/startupDiagnostics';
+import { getPostAuthRoute } from '@/utils/authRedirect';
 import { Colors } from '@/constants/theme';
 
 const supabase = getSupabaseClient();
@@ -23,37 +24,15 @@ export default function IndexScreen() {
         return;
       }
 
-      // User is authenticated, check if profile exists
-      const { data: profile, error } = await supabase
-        .from('user_profiles')
-        .select('username')
-        .eq('id', user.id)
-        .single();
+      const postAuthRoute = await getPostAuthRoute(user.id);
 
-      if (error || !profile?.username) {
-        logStartup('auth: profile incomplete, redirecting to /onboarding');
-        // Profile incomplete -> continue onboarding
-        router.replace('/onboarding');
-        return;
+      if (postAuthRoute === '/onboarding') {
+        logStartup('auth: onboarding incomplete, redirecting to /onboarding');
+      } else {
+        logStartup('auth: complete, redirecting to /(tabs)/dashboard');
       }
 
-      // Check if user has completed sport selection (has ratings)
-      const { data: ratings } = await supabase
-        .from('user_ratings')
-        .select('id')
-        .eq('user_id', user.id)
-        .limit(1);
-
-      if (!ratings || ratings.length === 0) {
-        logStartup('auth: no ratings, redirecting to /onboarding');
-        // No sports/ratings set -> continue onboarding
-        router.replace('/onboarding');
-        return;
-      }
-
-      // Everything complete -> go to dashboard
-      logStartup('auth: complete, redirecting to /(tabs)/dashboard');
-      router.replace('/(tabs)/dashboard');
+      router.replace(postAuthRoute);
     } catch (error) {
       console.error('Auth check error:', error);
       const message = error instanceof Error ? error.message : 'Unknown auth init error';
