@@ -3,8 +3,9 @@ import { View, Text, StyleSheet, KeyboardAvoidingView, Platform, Pressable } fro
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Button, Input } from '@/components';
-import { Colors, Typography, BorderRadius, Spacing } from '@/constants/theme';
+import { Colors, Typography, Spacing } from '@/constants/theme';
 import { getSupabaseClient } from '@/template';
+import { getPostAuthRoute } from '@/utils/authRedirect';
 
 const supabase = getSupabaseClient();
 
@@ -66,20 +67,8 @@ export default function VerifyCodeScreen() {
         return;
       }
 
-      // Check if user profile exists
-      const { data: profile } = await supabase
-        .from('user_profiles')
-        .select('username')
-        .eq('id', data.user.id)
-        .single();
-
-      if (profile?.username) {
-        // Profile exists, go to main app
-        router.replace('/(tabs)');
-      } else {
-        // New user, go to onboarding
-        router.replace('/onboarding');
-      }
+      const postAuthRoute = await getPostAuthRoute(data.user.id);
+      router.replace(postAuthRoute);
     } catch (err: any) {
       console.error('Verify error:', err);
       setError(err.message || 'Verification failed');
