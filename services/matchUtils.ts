@@ -17,11 +17,17 @@ export interface NormalizedSet {
  * @returns Array of normalized sets with a/b scores, or empty array if no valid sets
  */
 export function normalizeMatchSets(match: any): NormalizedSet[] {
-  if (!match?.sets || !Array.isArray(match.sets)) {
+  const rawSets = Array.isArray(match?.sets)
+    ? match.sets
+    : Array.isArray(match?.match_sets)
+      ? match.match_sets
+      : [];
+
+  if (rawSets.length === 0) {
     return [];
   }
 
-  return match.sets
+  return rawSets
     .filter((set: any) => {
       // Must have valid numeric scores
       const aScore = set.team_a_score ?? set.teamAScore ?? set.a;

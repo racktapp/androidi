@@ -15,6 +15,79 @@ import { Sport } from '@/constants/config';
 
 const supabase = getSupabaseClient();
 
+const asArray = <T>(value: unknown): T[] => (Array.isArray(value) ? value : []);
+
+const asObject = (value: unknown): Record<string, any> =>
+  value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, any> : {};
+
+const asString = (value: unknown, fallback = ''): string =>
+  typeof value === 'string' ? value : fallback;
+
+const asNullableString = (value: unknown): string | null =>
+  typeof value === 'string' ? value : null;
+
+const asFiniteNumber = (value: unknown, fallback = 0): number =>
+  typeof value === 'number' && Number.isFinite(value) ? value : fallback;
+
+function normalizeTournamentParticipant(raw: any): TournamentParticipant {
+  const participant = asObject(raw);
+  const userId = asString(participant.userId || participant.user_id);
+  const username = asString(participant.username);
+  const displayName =
+    asString(participant.displayName || participant.display_name) ||
+    username ||
+    'Unknown player';
+
+  return {
+    userId: userId || 'unknown-participant',
+    displayName,
+    username,
+    avatarUrl: asNullableString(participant.avatarUrl ?? participant.avatar_url),
+    joinedAt: asString(participant.joinedAt || participant.joined_at),
+    seed:
+      typeof participant.seed === 'number' && Number.isFinite(participant.seed)
+        ? participant.seed
+        : null,
+  };
+}
+
+function normalizeTournamentParticipants(value: unknown): TournamentParticipant[] {
+  return asArray<any>(value)
+    .map(normalizeTournamentParticipant)
+    .filter((participant) => participant.userId.length > 0);
+}
+
+function normalizeTournamentTeam(raw: any): TournamentTeam {
+  const team = asObject(raw);
+  const memberUserIds = asArray<unknown>(team.memberUserIds ?? team.member_user_ids).filter(
+    (userId): userId is string => typeof userId === 'string' && userId.length > 0
+  );
+  const members = normalizeTournamentParticipants(team.members);
+
+  return {
+    memberUserIds,
+    ...(members.length > 0 ? { members } : {}),
+  };
+}
+
+function normalizeTournamentScore(raw: unknown): Array<{ a: number; b: number }> {
+  return asArray<any>(raw)
+    .map((set) => {
+      const a = set?.a ?? set?.team_a_score ?? set?.teamAScore;
+      const b = set?.b ?? set?.team_b_score ?? set?.teamBScore;
+
+      if (!Number.isFinite(a) || !Number.isFinite(b)) {
+        return null;
+      }
+
+      return {
+        a: asFiniteNumber(a),
+        b: asFiniteNumber(b),
+      };
+    })
+    .filter((set): set is { a: number; b: number } => Boolean(set));
+}
+
 export const tournamentsService = {
   async createTournament(data: {
     title: string;
@@ -356,21 +429,27 @@ export const tournamentsService = {
   },
 
   mapTournament(raw: any): Tournament {
+    const tournament = asObject(raw);
+
     return {
-      id: raw.id,
-      createdByUserId: raw.created_by_user_id,
-      createdAt: raw.created_at,
-      updatedAt: raw.updated_at,
-      title: raw.title,
-      sport: raw.sport,
-      type: raw.type,
-      format: raw.format,
-      mode: raw.mode,
-      isCompetitive: raw.is_competitive,
-      state: raw.state,
-      groupId: raw.group_id,
-      participants: raw.participants || [],
-      settings: raw.settings || {},
+      id: asString(tournament.id),
+      createdByUserId: asString(tournament.created_by_user_id),
+      createdAt: asString(tournament.created_at),
+      updatedAt: asString(tournament.updated_at),
+      title: asString(tournament.title, 'Untitled tournament'),
+      sport: asString(tournament.sport, 'tennis') as Sport,
+      type: tournament.type === 'americano' ? 'americano' : 'normal',
+      format: tournament.format === 'groups_playoffs' ? 'groups_playoffs' : undefined,
+      mode: tournament.mode === 'doubles' ? 'doubles' : 'singles',
+      isCompetitive: Boolean(tournament.is_competitive),
+      state: (
+        ['draft', 'inviting', 'locked', 'in_progress', 'completed', 'deleted'].includes(tournament.state)
+          ? tournament.state
+          : 'draft'
+      ) as Tournament['state'],
+      groupId: asNullableString(tournament.group_id),
+      participants: normalizeTournamentParticipants(tournament.participants),
+      settings: asObject(tournament.settings),
     };
   },
 
@@ -757,32 +836,38 @@ export const tournamentsService = {
   },
 
   mapGroup(raw: any): TournamentGroup {
+    const group = asObject(raw);
+
     return {
-      id: raw.id,
-      tournamentId: raw.tournament_id,
-      name: raw.name,
-      groupIndex: raw.group_index,
-      participants: raw.participants || [],
-      createdAt: raw.created_at,
+      id: asString(group.id),
+      tournamentId: asString(group.tournament_id),
+      name: asString(group.name, 'Unnamed group'),
+      groupIndex: asFiniteNumber(group.group_index),
+      participants: normalizeTournamentParticipants(group.participants),
+      createdAt: asString(group.created_at),
     };
   },
 
   mapMatch(raw: any): TournamentMatch {
+    const match = asObject(raw);
+
     return {
-      id: raw.id,
-      tournamentId: raw.tournament_id,
-      stage: raw.stage,
-      groupId: raw.group_id,
-      roundIndex: raw.round_index,
-      teamA: raw.team_a,
-      teamB: raw.team_b,
-      score: raw.score || [],
-      status: raw.status,
-      submittedByUserId: raw.submitted_by_user_id,
-      confirmedByUserIds: raw.confirmed_by_user_ids || [],
-      winner: raw.winner,
-      createdAt: raw.created_at,
-      updatedAt: raw.updated_at,
+      id: asString(match.id),
+      tournamentId: asString(match.tournament_id),
+      stage: match.stage === 'playoff' ? 'playoff' : 'group',
+      groupId: asNullableString(match.group_id),
+      roundIndex: asFiniteNumber(match.round_index),
+      teamA: normalizeTournamentTeam(match.team_a),
+      teamB: normalizeTournamentTeam(match.team_b),
+      score: normalizeTournamentScore(match.score),
+      status: match.status === 'submitted' ? 'submitted' : match.status === 'confirmed' ? 'confirmed' : 'pending',
+      submittedByUserId: asNullableString(match.submitted_by_user_id),
+      confirmedByUserIds: asArray<unknown>(match.confirmed_by_user_ids).filter(
+        (userId): userId is string => typeof userId === 'string' && userId.length > 0
+      ),
+      winner: match.winner === 'A' || match.winner === 'B' ? match.winner : null,
+      createdAt: asString(match.created_at),
+      updatedAt: asString(match.updated_at),
     };
   },
 
