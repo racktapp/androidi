@@ -6,5 +6,6 @@ export { ScreenLoader } from './ScreenLoader';
 export { LoadingSpinner } from './LoadingSpinner';
 export { MatchPoster } from './MatchPoster';
 export type { PosterData } from './MatchPoster';
+export { AdMobBanner } from './AdMobBanner';
 export { SettingsRow, SettingsSection } from './settings';
 export { Avatar, Button, Input } from './ui';
