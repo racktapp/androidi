@@ -1,12 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable, RefreshControl, TextInput, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Pressable, RefreshControl, TextInput } from 'react-native';
 import { Image } from 'expo-image';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Colors, Typography, BorderRadius, Spacing } from '@/constants/theme';
-import { Button, ScreenLoader, EmptyState, ErrorState, UserAvatar } from '@/components';
-import { AdMobBanner } from '@/components/AdMobBanner';
+import { ErrorState, AdMobBanner } from '@/components';
 import { useGroups } from '@/hooks/useGroups';
 import { Group } from '@/types';
 import { getSupabaseClient } from '@/template';
@@ -196,7 +195,7 @@ export default function GroupsScreen() {
         ) : filteredGroups.length === 0 ? (
           <View style={styles.emptyStateContainer}>
             <MaterialIcons name="search-off" size={48} color={Colors.textMuted} />
-            <Text style={styles.emptyStateSubtitle}>No groups match "{searchQuery}"</Text>
+            <Text style={styles.emptyStateSubtitle}>{`No groups match “${searchQuery}”`}</Text>
           </View>
         ) : (
           <View style={styles.groupsList}>
@@ -310,8 +309,6 @@ const styles = StyleSheet.create({
     gap: Spacing.lg,
   },
   bannerContainer: {
-    borderTopWidth: 1,
-    borderTopColor: Colors.border,
     paddingTop: Spacing.sm,
     backgroundColor: Colors.background,
   },
