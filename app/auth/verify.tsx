@@ -66,20 +66,33 @@ export default function VerifyCodeScreen() {
         return;
       }
 
-      // Check if user profile exists
-      const { data: profile } = await supabase
+      // Check onboarding completion (profile + at least one rating)
+      const { data: profile, error: profileError } = await supabase
         .from('user_profiles')
         .select('username')
         .eq('id', data.user.id)
         .single();
 
-      if (profile?.username) {
-        // Profile exists, go to main app
-        router.replace('/(tabs)');
-      } else {
-        // New user, go to onboarding
+      if (profileError || !profile?.username) {
+        // Profile incomplete -> continue onboarding
         router.replace('/onboarding');
+        return;
       }
+
+      const { data: ratings } = await supabase
+        .from('user_ratings')
+        .select('id')
+        .eq('user_id', data.user.id)
+        .limit(1);
+
+      if (!ratings || ratings.length === 0) {
+        // No ratings yet -> continue onboarding
+        router.replace('/onboarding');
+        return;
+      }
+
+      // Fully onboarded -> go to main app
+      router.replace('/(tabs)');
     } catch (err: any) {
       console.error('Verify error:', err);
       setError(err.message || 'Verification failed');
