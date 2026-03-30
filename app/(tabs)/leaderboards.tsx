@@ -29,7 +29,7 @@ export default function LeaderboardsScreen() {
   const [selectedSport, setSelectedSport] = useState<Sport>('tennis');
   const [period, setPeriod] = useState<'monthly' | 'alltime'>('monthly');
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
-  const [isLoadingInitial, setIsLoadingInitial] = useState(true);
+  const [isBootstrapping, setIsBootstrapping] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -69,11 +69,22 @@ export default function LeaderboardsScreen() {
   };
 
   const loadGroups = async () => {
-    if (!userId) return;
-    const data = await getUserGroups(userId);
-    setGroups(data);
-    if (data.length > 0 && !selectedGroup) {
-      setSelectedGroup(data[0].id);
+    if (!userId) {
+      setIsBootstrapping(false);
+      return;
+    }
+
+    try {
+      const data = await getUserGroups(userId);
+      setGroups(data);
+      if (data.length > 0 && !selectedGroup) {
+        setSelectedGroup(data[0].id);
+      }
+    } catch (err) {
+      console.error('Error loading groups:', err);
+      setGroups([]);
+    } finally {
+      setIsBootstrapping(false);
     }
   };
 
@@ -96,8 +107,6 @@ export default function LeaderboardsScreen() {
     } catch (err: any) {
       console.error('Error loading leaderboard:', err);
       setError(err.message || 'Failed to load leaderboard');
-    } finally {
-      setIsLoadingInitial(false);
     }
   };
 
@@ -249,7 +258,7 @@ export default function LeaderboardsScreen() {
 
   const userRank = leaderboard.find(e => e.userId === userId);
 
-  if (isLoadingInitial) {
+  if (isBootstrapping) {
     return (
       <View style={[styles.container, { paddingTop: insets.top }]}>
         <View style={styles.header}>
