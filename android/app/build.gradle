@@ -92,7 +92,7 @@ android {
         applicationId 'com.taivas.rackt'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 204
+        versionCode 205
         versionName "1.0.0"
     }
     signingConfigs {
