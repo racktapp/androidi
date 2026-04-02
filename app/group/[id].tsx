@@ -200,8 +200,8 @@ export default function GroupDetailScreen() {
               transition={200}
             />
           </Pressable>
-          <Pressable onPress={() => router.push('/settings')}>
-            <MaterialIcons name="settings" size={24} color={Colors.textPrimary} />
+          <Pressable onPress={() => router.push(`/group-settings/${id}`)}>
+            <MaterialIcons name="more-vert" size={24} color={Colors.textPrimary} />
           </Pressable>
         </View>
         <View style={styles.initialLoadingState}>
@@ -230,8 +230,8 @@ export default function GroupDetailScreen() {
               transition={200}
             />
           </Pressable>
-          <Pressable onPress={() => router.push('/settings')}>
-            <MaterialIcons name="settings" size={24} color={Colors.textPrimary} />
+          <Pressable onPress={() => router.push(`/group-settings/${id}`)}>
+            <MaterialIcons name="more-vert" size={24} color={Colors.textPrimary} />
           </Pressable>
         </View>
         <View style={styles.emptyState}>
@@ -260,8 +260,8 @@ export default function GroupDetailScreen() {
           />
         </Pressable>
         <Text style={styles.headerTitle}>{group.name}</Text>
-        <Pressable onPress={() => router.push('/settings')}>
-          <MaterialIcons name="settings" size={24} color={Colors.textPrimary} />
+        <Pressable onPress={() => router.push(`/group-settings/${id}`)}>
+          <MaterialIcons name="more-vert" size={24} color={Colors.textPrimary} />
         </Pressable>
       </View>
 

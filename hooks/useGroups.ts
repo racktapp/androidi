@@ -30,8 +30,27 @@ export function useGroups() {
   };
 
   const addMember = async (groupId: string, userId: string) => {
-    // This would need a new edge function - placeholder for now
-    throw new Error('Not implemented');
+    await groupsService.addGroupMembers(groupId, [userId]);
+  };
+
+  const addMembers = async (groupId: string, userIds: string[]) => {
+    await groupsService.addGroupMembers(groupId, userIds);
+  };
+
+  const renameGroup = async (groupId: string, name: string) => {
+    await groupsService.renameGroup(groupId, name);
+  };
+
+  const removeMember = async (memberId: string) => {
+    await groupsService.removeMember(memberId);
+  };
+
+  const leaveGroup = async (groupId: string, userId: string) => {
+    await groupsService.leaveGroup(groupId, userId);
+  };
+
+  const deleteGroup = async (groupId: string) => {
+    await groupsService.deleteGroup(groupId);
   };
 
   return {
@@ -40,5 +59,10 @@ export function useGroups() {
     getGroupById,
     getGroupMembers,
     addMember,
+    addMembers,
+    renameGroup,
+    removeMember,
+    leaveGroup,
+    deleteGroup,
   };
 }
