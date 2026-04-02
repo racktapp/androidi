@@ -3,17 +3,6 @@ import { Sport } from '@/constants/config';
 
 const supabase = getSupabaseClient();
 
-async function invokeFunction(name: string, body: any) {
-  const { data, error } = await supabase.functions.invoke(name, { body });
-  
-  if (error) {
-    const errorMessage = error.message || 'Function call failed';
-    throw new Error(errorMessage);
-  }
-  
-  return data;
-}
-
 export const groupsService = {
   async createGroup(data: {
     name: string;
@@ -120,10 +109,74 @@ export const groupsService = {
 
     return (data || []).map((item: any) => ({
       id: item.id,
+      groupId,
       userId: item.user.id,
       role: item.role,
       joinedAt: item.joined_at,
       user: item.user,
     }));
+  },
+
+  async renameGroup(groupId: string, name: string) {
+    const { error } = await supabase
+      .from('groups')
+      .update({ name })
+      .eq('id', groupId);
+
+    if (error) throw error;
+  },
+
+  async addGroupMembers(groupId: string, userIds: string[]) {
+    if (userIds.length === 0) return;
+
+    const { data: existingMembers, error: membersError } = await supabase
+      .from('group_members')
+      .select('user_id')
+      .eq('group_id', groupId)
+      .in('user_id', userIds);
+
+    if (membersError) throw membersError;
+
+    const existingUserIds = new Set((existingMembers || []).map((m: any) => m.user_id));
+    const newRows = userIds
+      .filter(userId => !existingUserIds.has(userId))
+      .map(userId => ({
+        group_id: groupId,
+        user_id: userId,
+        role: 'member',
+      }));
+
+    if (newRows.length === 0) return;
+
+    const { error } = await supabase.from('group_members').insert(newRows);
+    if (error) throw error;
+  },
+
+  async removeMember(memberId: string) {
+    const { error } = await supabase
+      .from('group_members')
+      .delete()
+      .eq('id', memberId);
+
+    if (error) throw error;
+  },
+
+  async leaveGroup(groupId: string, userId: string) {
+    const { error } = await supabase
+      .from('group_members')
+      .delete()
+      .eq('group_id', groupId)
+      .eq('user_id', userId);
+
+    if (error) throw error;
+  },
+
+  async deleteGroup(groupId: string) {
+    const { error } = await supabase
+      .from('groups')
+      .delete()
+      .eq('id', groupId);
+
+    if (error) throw error;
   },
 };
