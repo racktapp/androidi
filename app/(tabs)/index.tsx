@@ -5,7 +5,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Colors, Typography, BorderRadius, Spacing } from '@/constants/theme';
-import { Button, ScreenLoader, EmptyState, ErrorState, UserAvatar } from '@/components';
+import { ErrorState } from '@/components';
 import { AdMobBanner } from '@/components/AdMobBanner';
 import { useGroups } from '@/hooks/useGroups';
 import { Group } from '@/types';
@@ -247,11 +247,12 @@ export default function GroupsScreen() {
             <Text style={styles.createButtonText}>Create Group</Text>
           </Pressable>
         </View>
+
+        <View style={styles.inlineBannerContainer}>
+          <AdMobBanner />
+        </View>
       </ScrollView>
 
-      <View style={[styles.bannerContainer, { paddingBottom: insets.bottom }]}>
-        <AdMobBanner />
-      </View>
     </View>
   );
 }
@@ -306,14 +307,13 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    padding: Spacing.lg,
+    paddingHorizontal: Spacing.lg,
+    paddingTop: Spacing.lg,
+    paddingBottom: Spacing.lg,
     gap: Spacing.lg,
   },
-  bannerContainer: {
-    borderTopWidth: 1,
-    borderTopColor: Colors.border,
-    paddingTop: Spacing.sm,
-    backgroundColor: Colors.background,
+  inlineBannerContainer: {
+    marginTop: Spacing.sm,
   },
   groupsList: {
     gap: Spacing.md,
