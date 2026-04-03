@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable, TextInput } from 'react-native';
-import { Image } from 'expo-image';
+import { View, Text, StyleSheet, ScrollView, Pressable } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -9,6 +8,7 @@ import { Colors, Typography, BorderRadius, Spacing } from '@/constants/theme';
 import { Button } from '@/components';
 import { Sport, Config } from '@/constants/config';
 import { getSupabaseClient } from '@/template';
+import LevelSelectionPanel from '@/components/level/LevelSelectionPanel';
 
 const supabase = getSupabaseClient();
 
@@ -108,10 +108,6 @@ export default function EditLevelScreen() {
     } finally {
       setLoading(false);
     }
-  };
-
-  const getLevelForChoice = (choice: 'beginner' | 'intermediate' | 'advanced') => {
-    return Config.onboardingLevels[choice];
   };
 
   const handleManualInput = (value: string) => {
@@ -233,161 +229,20 @@ export default function EditLevelScreen() {
           </Text>
         </View>
 
-        {/* Sport Selector */}
-        <View style={styles.sportSelector}>
-          <Pressable
-            style={[styles.sportTab, selectedSport === 'tennis' && styles.sportTabActive]}
-            onPress={() => setSelectedSport('tennis')}
-          >
-            <Image
-              source={require('@/assets/icons/tennis_icon.png')}
-              style={[
-                styles.sportIconSmall,
-                selectedSport !== 'tennis' && styles.sportIconInactive,
-              ]}
-              contentFit="contain"
-              transition={0}
-            />
-            <Text style={[
-              styles.sportTabText,
-              selectedSport === 'tennis' && styles.sportTabTextActive,
-            ]}>
-              Tennis
-            </Text>
-          </Pressable>
-
-          <Pressable
-            style={[styles.sportTab, selectedSport === 'padel' && styles.sportTabActive]}
-            onPress={() => setSelectedSport('padel')}
-          >
-            <Image
-              source={require('@/assets/icons/padel_icon.png')}
-              style={[
-                styles.sportIconSmall,
-                selectedSport !== 'padel' && styles.sportIconInactive,
-              ]}
-              contentFit="contain"
-              transition={0}
-            />
-            <Text style={[
-              styles.sportTabText,
-              selectedSport === 'padel' && styles.sportTabTextActive,
-            ]}>
-              Padel
-            </Text>
-          </Pressable>
-        </View>
-
-        {/* Preset Choices */}
-        <View style={styles.levelsContainer}>
-          <Pressable
-            style={[
-              styles.levelChoice,
-              level === getLevelForChoice('beginner') && !manualMode && styles.levelChoiceSelected,
-            ]}
-            onPress={() => {
-              setLevel(getLevelForChoice('beginner'));
-              setManualMode(false);
-              setManualInput(getLevelForChoice('beginner').toFixed(1));
-            }}
-          >
-            <Text style={styles.levelChoiceTitle}>New / Beginner</Text>
-            <Text style={styles.levelChoiceLevel}>Level {getLevelForChoice('beginner').toFixed(1)}</Text>
-          </Pressable>
-
-          <Pressable
-            style={[
-              styles.levelChoice,
-              level === getLevelForChoice('intermediate') && !manualMode && styles.levelChoiceSelected,
-            ]}
-            onPress={() => {
-              setLevel(getLevelForChoice('intermediate'));
-              setManualMode(false);
-              setManualInput(getLevelForChoice('intermediate').toFixed(1));
-            }}
-          >
-            <Text style={styles.levelChoiceTitle}>Casual / Intermediate</Text>
-            <Text style={styles.levelChoiceLevel}>Level {getLevelForChoice('intermediate').toFixed(1)}</Text>
-          </Pressable>
-
-          <Pressable
-            style={[
-              styles.levelChoice,
-              level === getLevelForChoice('advanced') && !manualMode && styles.levelChoiceSelected,
-            ]}
-            onPress={() => {
-              setLevel(getLevelForChoice('advanced'));
-              setManualMode(false);
-              setManualInput(getLevelForChoice('advanced').toFixed(1));
-            }}
-          >
-            <Text style={styles.levelChoiceTitle}>Competitive / Advanced</Text>
-            <Text style={styles.levelChoiceLevel}>Level {getLevelForChoice('advanced').toFixed(1)}</Text>
-          </Pressable>
-
-          <Pressable
-            style={styles.manualButton}
-            onPress={() => {
-              setManualMode(!manualMode);
-              if (!manualMode) {
-                setManualInput(level.toFixed(1));
-              }
-            }}
-          >
-            <Text style={styles.manualButtonText}>
-              {manualMode ? '← Back to presets' : 'I already know my level →'}
-            </Text>
-          </Pressable>
-        </View>
-
-        {/* Manual Input */}
-        {manualMode && (
-          <View style={styles.manualInputContainer}>
-            <Text style={styles.manualLabel}>Enter your level ({Config.rating.min}–{Config.rating.max})</Text>
-            <TextInput
-              style={styles.manualInput}
-              value={manualInput}
-              onChangeText={handleManualInput}
-              placeholder="2.5"
-              placeholderTextColor={Colors.textDisabled}
-              keyboardType="decimal-pad"
-              maxLength={3}
-            />
-            {parseFloat(manualInput) > Config.rating.onboardingMax && !isNaN(parseFloat(manualInput)) && (
-              <Text style={styles.warningText}>
-                ⚠️ Most players are between {Config.rating.min}–{Config.rating.onboardingMax}, but you can set any level.
-              </Text>
-            )}
-            {errors.manual && <Text style={styles.errorText}>{errors.manual}</Text>}
-          </View>
-        )}
-
-        {/* Current Level Display */}
-        <View style={styles.currentLevelContainer}>
-          <View style={styles.sportIconContainer}>
-            <Image
-              source={selectedSport === 'tennis' 
-                ? require('@/assets/icons/tennis_icon.png')
-                : require('@/assets/icons/padel_icon.png')
-              }
-              style={styles.sportIconLarge}
-              contentFit="contain"
-              transition={200}
-            />
-          </View>
-          <Text style={styles.suggestedLabel}>Your level:</Text>
-          <Text style={styles.currentLevelText}>{level.toFixed(1)}</Text>
-          {currentRating && (
-            <>
-              <Text style={styles.reliabilityNote}>
-                Reliability: {(currentRating.reliability * 100).toFixed(0)}%
-              </Text>
-              <Text style={styles.reliabilitySubnote}>
-                {currentRating.matchesPlayed} competitive matches played
-              </Text>
-            </>
-          )}
-        </View>
+        <LevelSelectionPanel
+          sport={selectedSport}
+          level={level}
+          manualMode={manualMode}
+          manualInput={manualInput}
+          onLevelChange={setLevel}
+          onManualModeChange={setManualMode}
+          onManualInputChange={handleManualInput}
+          manualError={errors.manual}
+          reliabilityText={currentRating ? `Reliability: ${(currentRating.reliability * 100).toFixed(0)}%` : 'Reliability: --'}
+          reliabilitySubtext={currentRating ? `${currentRating.matchesPlayed} competitive matches played` : 'No competitive matches played yet'}
+          showSportSelector
+          onSportChange={setSelectedSport}
+        />
 
         {errors.submit && <Text style={styles.errorText}>{errors.submit}</Text>}
 
@@ -457,144 +312,6 @@ const styles = StyleSheet.create({
     color: Colors.textMuted,
     textAlign: 'center',
     lineHeight: 20,
-  },
-  sportSelector: {
-    flexDirection: 'row',
-    backgroundColor: Colors.surface,
-    borderRadius: BorderRadius.md,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    padding: 2,
-    gap: 2,
-  },
-  sportTab: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: Spacing.xs,
-    paddingVertical: Spacing.sm,
-    borderRadius: BorderRadius.sm,
-  },
-  sportTabActive: {
-    backgroundColor: Colors.accentGold,
-    shadowColor: Colors.accentGold,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  sportTabText: {
-    fontSize: Typography.sizes.sm,
-    fontWeight: Typography.weights.medium,
-    color: Colors.textMuted,
-  },
-  sportTabTextActive: {
-    color: Colors.textPrimary,
-    fontWeight: Typography.weights.semibold,
-  },
-  sportIconSmall: {
-    width: 20,
-    height: 20,
-  },
-  sportIconInactive: {
-    opacity: 0.5,
-  },
-  levelsContainer: {
-    gap: Spacing.md,
-  },
-  levelChoice: {
-    backgroundColor: Colors.surface,
-    borderRadius: BorderRadius.md,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    padding: Spacing.lg,
-  },
-  levelChoiceSelected: {
-    borderColor: Colors.primary,
-    backgroundColor: Colors.surfaceElevated,
-    borderWidth: 2,
-  },
-  levelChoiceTitle: {
-    fontSize: Typography.sizes.lg,
-    fontWeight: Typography.weights.semibold,
-    color: Colors.textPrimary,
-    marginBottom: Spacing.xs,
-  },
-  levelChoiceLevel: {
-    fontSize: Typography.sizes.sm,
-    color: Colors.textMuted,
-  },
-  manualButton: {
-    alignItems: 'center',
-    paddingVertical: Spacing.sm,
-  },
-  manualButtonText: {
-    fontSize: Typography.sizes.sm,
-    color: Colors.primary,
-    fontWeight: Typography.weights.medium,
-  },
-  manualInputContainer: {
-    backgroundColor: Colors.surfaceElevated,
-    borderRadius: BorderRadius.md,
-    padding: Spacing.lg,
-    gap: Spacing.sm,
-  },
-  manualLabel: {
-    fontSize: Typography.sizes.sm,
-    color: Colors.textMuted,
-    textAlign: 'center',
-  },
-  manualInput: {
-    backgroundColor: Colors.background,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    borderRadius: BorderRadius.md,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.md,
-    fontSize: Typography.sizes.xxl,
-    fontWeight: Typography.weights.bold,
-    color: Colors.textPrimary,
-    textAlign: 'center',
-  },
-  warningText: {
-    fontSize: Typography.sizes.xs,
-    color: Colors.warning,
-    textAlign: 'center',
-    marginTop: Spacing.xs,
-  },
-  currentLevelContainer: {
-    backgroundColor: Colors.surfaceElevated,
-    borderRadius: BorderRadius.md,
-    padding: Spacing.lg,
-    alignItems: 'center',
-    gap: Spacing.xs,
-  },
-  sportIconContainer: {
-    marginBottom: Spacing.sm,
-  },
-  sportIconLarge: {
-    width: 48,
-    height: 48,
-  },
-  suggestedLabel: {
-    fontSize: Typography.sizes.sm,
-    color: Colors.textMuted,
-  },
-  currentLevelText: {
-    fontSize: Typography.sizes.xxxl,
-    fontWeight: Typography.weights.bold,
-    color: Colors.primary,
-  },
-  reliabilityNote: {
-    fontSize: Typography.sizes.sm,
-    color: Colors.textMuted,
-  },
-  reliabilitySubnote: {
-    fontSize: Typography.sizes.xs,
-    color: Colors.textDisabled,
-    textAlign: 'center',
-    marginTop: Spacing.xs,
   },
   actions: {
     gap: Spacing.md,
