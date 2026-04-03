@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable, TextInput } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Pressable } from 'react-native';
 import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -7,6 +7,7 @@ import { Button, Input } from '@/components';
 import { Colors, Typography, BorderRadius, Spacing } from '@/constants/theme';
 import { Config, Sport } from '@/constants/config';
 import { getSupabaseClient } from '@/template';
+import LevelSelectionPanel from '@/components/level/LevelSelectionPanel';
 
 const supabase = getSupabaseClient();
 
@@ -101,28 +102,6 @@ export default function OnboardingScreen() {
     setStep('levels');
   };
 
-  const getLevelForChoice = (choice: 'beginner' | 'intermediate' | 'advanced') => {
-    return Config.onboardingLevels[choice];
-  };
-
-  const adjustLevel = (adjustment: 'lower' | 'same' | 'higher') => {
-    const sport = selectedSports[currentSportIndex];
-    let newLevel = manualMode && manualInput ? parseFloat(manualInput) : levels[sport];
-    
-    if (adjustment === 'lower') {
-      newLevel -= Config.onboardingLevels.adjustment;
-    } else if (adjustment === 'higher') {
-      newLevel += Config.onboardingLevels.adjustment;
-    }
-    
-    newLevel = Math.max(0, Math.min(7.0, newLevel));
-    setLevels({ ...levels, [sport]: Number(newLevel.toFixed(1)) });
-    
-    if (manualMode) {
-      setManualInput(newLevel.toFixed(1));
-    }
-  };
-
   const handleManualInput = (value: string) => {
     setManualInput(value);
     const parsed = parseFloat(value);
@@ -132,21 +111,6 @@ export default function OnboardingScreen() {
       const sport = selectedSports[currentSportIndex];
       setLevels({ ...levels, [sport]: Number(clamped.toFixed(1)) });
     }
-  };
-
-  const handleUseManualLevel = () => {
-    const parsed = parseFloat(manualInput);
-    
-    if (isNaN(parsed)) {
-      setErrors({ manual: 'Please enter a valid number' });
-      return;
-    }
-    
-    const clamped = Math.max(0, Math.min(7.0, parsed));
-    const sport = selectedSports[currentSportIndex];
-    setLevels({ ...levels, [sport]: Number(clamped.toFixed(1)) });
-    setManualMode(false);
-    setErrors({});
   };
 
   const handleNextLevel = () => {
@@ -308,101 +272,18 @@ export default function OnboardingScreen() {
           {currentSportIndex + 1} of {selectedSports.length}
         </Text>
 
-        <View style={styles.levelsContainer}>
-          <Pressable
-            style={styles.levelChoice}
-            onPress={() => {
-              setLevels({ ...levels, [currentSport]: getLevelForChoice('beginner') });
-              setManualMode(false);
-            }}
-          >
-            <Text style={styles.levelChoiceTitle}>New / Beginner</Text>
-            <Text style={styles.levelChoiceLevel}>Level {getLevelForChoice('beginner')}</Text>
-          </Pressable>
-
-          <Pressable
-            style={styles.levelChoice}
-            onPress={() => {
-              setLevels({ ...levels, [currentSport]: getLevelForChoice('intermediate') });
-              setManualMode(false);
-            }}
-          >
-            <Text style={styles.levelChoiceTitle}>Casual / Intermediate</Text>
-            <Text style={styles.levelChoiceLevel}>Level {getLevelForChoice('intermediate')}</Text>
-          </Pressable>
-
-          <Pressable
-            style={styles.levelChoice}
-            onPress={() => {
-              setLevels({ ...levels, [currentSport]: getLevelForChoice('advanced') });
-              setManualMode(false);
-            }}
-          >
-            <Text style={styles.levelChoiceTitle}>Competitive / Advanced</Text>
-            <Text style={styles.levelChoiceLevel}>Level {getLevelForChoice('advanced')}</Text>
-          </Pressable>
-
-          <Pressable
-            style={styles.manualButton}
-            onPress={() => {
-              setManualMode(!manualMode);
-              if (!manualMode) {
-                setManualInput(currentLevel.toFixed(1));
-              }
-            }}
-          >
-            <Text style={styles.manualButtonText}>
-              {manualMode ? '← Back to presets' : 'I already know my rank →'}
-            </Text>
-          </Pressable>
-        </View>
-
-        {manualMode && (
-          <View style={styles.manualInputContainer}>
-            <Text style={styles.manualLabel}>Enter your level (0.0–7.0)</Text>
-            <TextInput
-              style={styles.manualInput}
-              value={manualInput}
-              onChangeText={handleManualInput}
-              placeholder="2.5"
-              placeholderTextColor={Colors.textDisabled}
-              keyboardType="decimal-pad"
-              maxLength={3}
-            />
-            {parseFloat(manualInput) > 4.5 && !isNaN(parseFloat(manualInput)) && (
-              <Text style={styles.warningText}>
-                ⚠️ Most players start between 0–4, but you can set any level.
-              </Text>
-            )}
-            {errors.manual && <Text style={styles.errorText}>{errors.manual}</Text>}
-          </View>
-        )}
-
-        <View style={styles.currentLevelContainer}>
-          <Text style={styles.suggestedLabel}>Your starting level:</Text>
-          <Text style={styles.currentLevelText}>{currentLevel.toFixed(1)}</Text>
-          <Text style={styles.reliabilityNote}>
-            Reliability: {(Config.rating.initialReliability * 100).toFixed(0)}%
-          </Text>
-          <Text style={styles.reliabilitySubnote}>
-            Only competitive confirmed matches change your level
-          </Text>
-        </View>
-
-        <View style={styles.adjustmentContainer}>
-          <Text style={styles.adjustLabel}>Adjust:</Text>
-          <View style={styles.adjustButtons}>
-            <Pressable style={styles.adjustButton} onPress={() => adjustLevel('lower')}>
-              <Text style={styles.adjustButtonText}>Lower</Text>
-            </Pressable>
-            <Pressable style={styles.adjustButton} onPress={() => adjustLevel('same')}>
-              <Text style={styles.adjustButtonText}>About right</Text>
-            </Pressable>
-            <Pressable style={styles.adjustButton} onPress={() => adjustLevel('higher')}>
-              <Text style={styles.adjustButtonText}>Higher</Text>
-            </Pressable>
-          </View>
-        </View>
+        <LevelSelectionPanel
+          sport={currentSport}
+          level={currentLevel}
+          manualMode={manualMode}
+          manualInput={manualInput}
+          onLevelChange={(value) => setLevels({ ...levels, [currentSport]: value })}
+          onManualModeChange={setManualMode}
+          onManualInputChange={handleManualInput}
+          manualError={errors.manual}
+          reliabilityText={`Reliability: ${(Config.rating.initialReliability * 100).toFixed(0)}%`}
+          reliabilitySubtext="Only competitive confirmed matches change your level"
+        />
 
         {errors.submit && <Text style={styles.errorText}>{errors.submit}</Text>}
 
@@ -493,116 +374,6 @@ const styles = StyleSheet.create({
     fontSize: Typography.sizes.base,
     fontWeight: Typography.weights.semibold,
     color: Colors.textPrimary,
-  },
-  levelsContainer: {
-    gap: Spacing.md,
-  },
-  levelChoice: {
-    backgroundColor: Colors.surface,
-    borderRadius: BorderRadius.md,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    padding: Spacing.lg,
-  },
-  levelChoiceTitle: {
-    fontSize: Typography.sizes.lg,
-    fontWeight: Typography.weights.semibold,
-    color: Colors.textPrimary,
-    marginBottom: Spacing.xs,
-  },
-  levelChoiceLevel: {
-    fontSize: Typography.sizes.sm,
-    color: Colors.textMuted,
-  },
-  manualButton: {
-    alignItems: 'center',
-    paddingVertical: Spacing.sm,
-  },
-  manualButtonText: {
-    fontSize: Typography.sizes.sm,
-    color: Colors.primary,
-    fontWeight: Typography.weights.medium,
-  },
-  manualInputContainer: {
-    backgroundColor: Colors.surfaceElevated,
-    borderRadius: BorderRadius.md,
-    padding: Spacing.lg,
-    gap: Spacing.sm,
-  },
-  manualLabel: {
-    fontSize: Typography.sizes.sm,
-    color: Colors.textMuted,
-    textAlign: 'center',
-  },
-  manualInput: {
-    backgroundColor: Colors.background,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    borderRadius: BorderRadius.md,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.md,
-    fontSize: Typography.sizes.xxl,
-    fontWeight: Typography.weights.bold,
-    color: Colors.textPrimary,
-    textAlign: 'center',
-  },
-  warningText: {
-    fontSize: Typography.sizes.xs,
-    color: Colors.warning,
-    textAlign: 'center',
-    marginTop: Spacing.xs,
-  },
-  currentLevelContainer: {
-    backgroundColor: Colors.surfaceElevated,
-    borderRadius: BorderRadius.md,
-    padding: Spacing.lg,
-    alignItems: 'center',
-    gap: Spacing.xs,
-  },
-  suggestedLabel: {
-    fontSize: Typography.sizes.sm,
-    color: Colors.textMuted,
-  },
-  currentLevelText: {
-    fontSize: Typography.sizes.xxxl,
-    fontWeight: Typography.weights.bold,
-    color: Colors.primary,
-  },
-  reliabilityNote: {
-    fontSize: Typography.sizes.sm,
-    color: Colors.textMuted,
-  },
-  reliabilitySubnote: {
-    fontSize: Typography.sizes.xs,
-    color: Colors.textDisabled,
-    textAlign: 'center',
-    marginTop: Spacing.xs,
-  },
-  adjustmentContainer: {
-    gap: Spacing.sm,
-  },
-  adjustLabel: {
-    fontSize: Typography.sizes.sm,
-    color: Colors.textMuted,
-    textAlign: 'center',
-  },
-  adjustButtons: {
-    flexDirection: 'row',
-    gap: Spacing.sm,
-  },
-  adjustButton: {
-    flex: 1,
-    backgroundColor: Colors.surface,
-    borderRadius: BorderRadius.md,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    padding: Spacing.md,
-    alignItems: 'center',
-  },
-  adjustButtonText: {
-    fontSize: Typography.sizes.sm,
-    color: Colors.textPrimary,
-    fontWeight: Typography.weights.medium,
   },
   errorText: {
     color: Colors.danger,
