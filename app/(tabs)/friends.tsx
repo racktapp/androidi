@@ -47,6 +47,52 @@ export default function FriendsScreen() {
     }
   }, [userId, tab]);
 
+  useEffect(() => {
+    if (!userId) return;
+
+    const channel = supabase
+      .channel(`friend-request-notifications-${userId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'friend_requests',
+          filter: `receiver_id=eq.${userId}`,
+        },
+        (payload) => {
+          const newRequest = payload.new as { status?: string } | null;
+          if (newRequest?.status === 'pending') {
+            showAlert('New Friend Request', 'Someone sent you a friend request.');
+            loadData();
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'friend_requests',
+          filter: `sender_id=eq.${userId}`,
+        },
+        (payload) => {
+          const previousRequest = payload.old as { status?: string } | null;
+          const updatedRequest = payload.new as { status?: string } | null;
+
+          if (previousRequest?.status === 'pending' && updatedRequest?.status === 'accepted') {
+            showAlert('Friend Request Accepted', 'Your friend request was accepted.');
+            loadData();
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [userId]);
+
   const loadUserId = async () => {
     const { data: { user } } = await supabase.auth.getUser();
     setUserId(user?.id || null);
