@@ -118,6 +118,7 @@ export default function ProfileScreen() {
         .select('id, new_level, created_at')
         .eq('user_id', userId)
         .eq('sport', sport)
+        .not('match_id', 'is', null)
         .order('created_at', { ascending: true })
         .limit(10);
 
@@ -207,7 +208,7 @@ export default function ProfileScreen() {
 
     // Simple text-based trend display
     const startLevel = ratingHistory[0].level;
-    const currentLevel = stats.level;
+    const currentLevel = ratingHistory[ratingHistory.length - 1].level;
     const delta = currentLevel - startLevel;
     const trend = delta > 0 ? '📈' : delta < 0 ? '📉' : '➡️';
 
