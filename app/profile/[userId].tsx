@@ -215,8 +215,8 @@ export default function ProfileScreen() {
       <View style={styles.trendDisplay}>
         <Text style={styles.trendEmoji}>{trend}</Text>
         <View style={styles.trendStats}>
-          <Text style={styles.trendLabel}>Started: {startLevel.toFixed(1)}</Text>
-          <Text style={styles.trendLabel}>Current: {currentLevel.toFixed(1)}</Text>
+          <Text style={styles.trendValueLabel}>Started: {startLevel.toFixed(1)}</Text>
+          <Text style={styles.trendValueLabel}>Current: {currentLevel.toFixed(1)}</Text>
           <Text style={[
             styles.trendDelta,
             delta > 0 ? styles.trendDeltaPositive : delta < 0 ? styles.trendDeltaNegative : {},
@@ -515,7 +515,7 @@ const styles = StyleSheet.create({
     flex: 1,
     gap: Spacing.xs,
   },
-  trendLabel: {
+  trendValueLabel: {
     fontSize: Typography.sizes.sm,
     color: Colors.textMuted,
   },
