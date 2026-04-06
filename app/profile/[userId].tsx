@@ -147,6 +147,7 @@ export default function ProfileScreen() {
           .select(`
             id,
             type,
+            status,
             winner_team,
             match_players(user_id, team, user:user_id(username)),
             match_sets(set_number, team_a_score, team_b_score)
