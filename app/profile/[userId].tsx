@@ -197,7 +197,7 @@ export default function ProfileScreen() {
   };
 
   const renderTrendChart = () => {
-    if (ratingHistory.length < 2) {
+    if (!stats || ratingHistory.length === 0) {
       return (
         <View style={styles.noChartContainer}>
           <Text style={styles.noChartText}>No competitive matches yet</Text>
@@ -206,17 +206,17 @@ export default function ProfileScreen() {
     }
 
     // Simple text-based trend display
-    const firstLevel = ratingHistory[0].level;
-    const lastLevel = ratingHistory[ratingHistory.length - 1].level;
-    const delta = lastLevel - firstLevel;
+    const startLevel = ratingHistory[0].level;
+    const currentLevel = stats.level;
+    const delta = currentLevel - startLevel;
     const trend = delta > 0 ? '📈' : delta < 0 ? '📉' : '➡️';
 
     return (
       <View style={styles.trendDisplay}>
         <Text style={styles.trendEmoji}>{trend}</Text>
         <View style={styles.trendStats}>
-          <Text style={styles.trendLabel}>Started: {firstLevel.toFixed(1)}</Text>
-          <Text style={styles.trendLabel}>Current: {lastLevel.toFixed(1)}</Text>
+          <Text style={styles.trendValueLabel}>Started: {startLevel.toFixed(1)}</Text>
+          <Text style={styles.trendValueLabel}>Current: {currentLevel.toFixed(1)}</Text>
           <Text style={[
             styles.trendDelta,
             delta > 0 ? styles.trendDeltaPositive : delta < 0 ? styles.trendDeltaNegative : {},
@@ -515,7 +515,7 @@ const styles = StyleSheet.create({
     flex: 1,
     gap: Spacing.xs,
   },
-  trendLabel: {
+  trendValueLabel: {
     fontSize: Typography.sizes.sm,
     color: Colors.textMuted,
   },
