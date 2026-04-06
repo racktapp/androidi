@@ -216,7 +216,7 @@ export const matchesService = {
         // Get match stats
         let query = supabase
           .from('match_players')
-          .select('match_id, team, match:match_id(id, winner_team, status, sport, group_id, created_at)')
+          .select('match_id, team, match:match_id(id, winner_team, status, sport, group_id, created_at, type)')
           .eq('user_id', member.user_id);
 
         const { data: playerMatches } = await query;
@@ -224,6 +224,7 @@ export const matchesService = {
         const matches = (playerMatches || [])
           .filter((pm: any) => 
             pm.match.status === 'confirmed' &&
+            pm.match.type === 'competitive' &&
             pm.match.sport === sport &&
             pm.match.group_id === groupId
           )

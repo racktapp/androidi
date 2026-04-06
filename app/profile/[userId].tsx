@@ -86,6 +86,7 @@ export default function ProfileScreen() {
       const confirmedMatches = (playerMatches || [])
         .filter((pm: any) => 
           pm.match?.status === 'confirmed' &&
+          pm.match?.type === 'competitive' &&
           pm.match?.sport === sport &&
           pm.match?.group_id === groupId
         )
