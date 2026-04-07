@@ -45,6 +45,7 @@ export interface Group {
   name: string;
   sportFocus: Sport | 'mixed';
   ownerId: string;
+  inviteCode?: string;
   createdAt: string;
   memberCount?: number;
   owner?: User;
@@ -54,7 +55,7 @@ export interface GroupMember {
   id: string;
   groupId: string;
   userId: string;
-  role: 'owner' | 'member';
+  role: 'owner' | 'admin' | 'member';
   joinedAt: string;
   user?: User;
 }
@@ -190,7 +191,7 @@ export interface TournamentMatch {
   roundIndex: number;
   teamA: TournamentTeam;
   teamB: TournamentTeam;
-  score: Array<{ a: number; b: number }>;
+  score: { a: number; b: number }[];
   status: 'pending' | 'submitted' | 'confirmed';
   submittedByUserId: string | null;
   confirmedByUserIds: string[];

@@ -45,6 +45,18 @@ export function useGroups() {
     await groupsService.removeMember(memberId);
   };
 
+  const updateMemberRole = async (memberId: string, role: 'admin' | 'member') => {
+    await groupsService.updateMemberRole(memberId, role);
+  };
+
+  const transferOwnership = async (groupId: string, nextOwnerUserId: string, currentOwnerUserId: string) => {
+    await groupsService.transferOwnership(groupId, nextOwnerUserId, currentOwnerUserId);
+  };
+
+  const updateInviteCode = async (groupId: string, inviteCode: string) => {
+    await groupsService.updateInviteCode(groupId, inviteCode);
+  };
+
   const leaveGroup = async (groupId: string, userId: string) => {
     await groupsService.leaveGroup(groupId, userId);
   };
@@ -62,6 +74,9 @@ export function useGroups() {
     addMembers,
     renameGroup,
     removeMember,
+    updateMemberRole,
+    transferOwnership,
+    updateInviteCode,
     leaveGroup,
     deleteGroup,
   };
