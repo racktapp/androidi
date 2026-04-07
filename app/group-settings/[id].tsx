@@ -33,14 +33,14 @@ export default function GroupSettingsScreen() {
   const [inviteCode, setInviteCode] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [isUpdatingRoles, setIsUpdatingRoles] = useState(false);
+  const [activeMemberId, setActiveMemberId] = useState<string | null>(null);
   const [newGroupName, setNewGroupName] = useState('');
 
   const [confirmAction, setConfirmAction] = useState<ConfirmAction>(null);
   const [selectedMember, setSelectedMember] = useState<GroupMember | null>(null);
 
-  const buildInviteCode = (groupId: string) => {
-    return groupId.replace(/-/g, '').slice(0, 8).toUpperCase();
-  };
+  const buildInviteCode = (value: string) => value.replace(/-/g, '').slice(0, 8).toUpperCase();
 
   const loadData = useCallback(async () => {
     if (!groupId) return;
@@ -63,7 +63,7 @@ export default function GroupSettingsScreen() {
       setGroup(groupData);
       setMembers(membersData);
       setNewGroupName(groupData.name);
-      setInviteCode(buildInviteCode(groupData.id));
+      setInviteCode(groupData.inviteCode || buildInviteCode(groupData.id));
 
       if (currentUserId) {
         const friendsData = await friendsHook.getFriends(currentUserId);
@@ -84,6 +84,7 @@ export default function GroupSettingsScreen() {
   const currentMember = members.find(member => member.userId === userId);
   const currentRole = (currentMember?.role || 'member') as 'owner' | 'admin' | 'member';
   const canManageGroup = currentRole === 'owner' || currentRole === 'admin';
+  const isOwner = currentRole === 'owner';
 
   const addableFriends = useMemo(() => {
     const memberIds = new Set(members.map(member => member.userId));
@@ -139,11 +140,50 @@ export default function GroupSettingsScreen() {
   };
 
   const handleRegenerateInviteCode = async () => {
-    if (!canManageGroup) return;
+    if (!canManageGroup || !groupId) return;
 
     const regenerated = Math.random().toString(36).slice(2, 10).toUpperCase();
-    setInviteCode(regenerated);
-    showAlert('Invite Code Updated', 'Share the new code with members you trust.');
+    try {
+      await groupsHook.updateInviteCode(groupId, regenerated);
+      setInviteCode(regenerated);
+      showAlert('Invite Code Updated', 'Share the new code with members you trust.');
+    } catch (err: any) {
+      showAlert('Error', err.message || 'Failed to regenerate invite code');
+    }
+  };
+
+  const handleUpdateMemberRole = async (member: GroupMember, role: 'admin' | 'member') => {
+    if (!isOwner || member.userId === userId) return;
+
+    setIsUpdatingRoles(true);
+    setActiveMemberId(member.id);
+    try {
+      await groupsHook.updateMemberRole(member.id, role);
+      showAlert('Updated', `Member role updated to ${role}.`);
+      await loadData();
+    } catch (err: any) {
+      showAlert('Error', err.message || 'Failed to update member role');
+    } finally {
+      setActiveMemberId(null);
+      setIsUpdatingRoles(false);
+    }
+  };
+
+  const handleTransferOwnership = async (member: GroupMember) => {
+    if (!groupId || !userId || !isOwner || member.userId === userId) return;
+
+    setIsUpdatingRoles(true);
+    setActiveMemberId(member.id);
+    try {
+      await groupsHook.transferOwnership(groupId, member.userId, userId);
+      showAlert('Ownership Transferred', 'You are now an admin of this group.');
+      await loadData();
+    } catch (err: any) {
+      showAlert('Error', err.message || 'Failed to transfer ownership');
+    } finally {
+      setActiveMemberId(null);
+      setIsUpdatingRoles(false);
+    }
   };
 
   const requestRemoveMember = (member: GroupMember) => {
@@ -218,6 +258,7 @@ export default function GroupSettingsScreen() {
       </View>
 
       <ScrollView
+        style={styles.scrollView}
         contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 24 }]}
         showsVerticalScrollIndicator={false}
       >
@@ -239,7 +280,7 @@ export default function GroupSettingsScreen() {
                 disabled={saving || !newGroupName.trim()}
               />
             ) : (
-              <Text style={styles.helperText}>Only admins and owners can rename the group.</Text>
+              <Text style={styles.helperText}>Only owners and admins can rename the group.</Text>
             )}
           </View>
         </SettingsSection>
@@ -265,13 +306,39 @@ export default function GroupSettingsScreen() {
                 </View>
 
                 {!isCurrentUser && canManageGroup ? (
-                  <Pressable onPress={() => requestRemoveMember(member)} style={styles.removeChip}>
-                    <Text style={styles.removeChipText}>Remove</Text>
-                  </Pressable>
+                  <View style={styles.memberActions}>
+                    {isOwner && (
+                      <>
+                        <Pressable
+                          onPress={() => handleUpdateMemberRole(member, member.role === 'admin' ? 'member' : 'admin')}
+                          style={styles.memberActionChip}
+                          disabled={isUpdatingRoles}
+                        >
+                          <Text style={styles.memberActionText}>
+                            {member.role === 'admin' ? 'Remove admin' : 'Make admin'}
+                          </Text>
+                        </Pressable>
+                        <Pressable
+                          onPress={() => handleTransferOwnership(member)}
+                          style={styles.memberActionChip}
+                          disabled={isUpdatingRoles}
+                        >
+                          <Text style={styles.memberActionText}>Make owner</Text>
+                        </Pressable>
+                      </>
+                    )}
+                    <Pressable onPress={() => requestRemoveMember(member)} style={styles.removeChip}>
+                      <Text style={styles.removeChipText}>Remove</Text>
+                    </Pressable>
+                  </View>
                 ) : null}
               </View>
             );
           })}
+
+          {isUpdatingRoles && activeMemberId ? (
+            <Text style={styles.helperText}>Updating member permissions…</Text>
+          ) : null}
 
           {canManageGroup && addableFriends.length > 0 && (
             <View style={styles.addMembersBox}>
@@ -311,8 +378,12 @@ export default function GroupSettingsScreen() {
             <Text style={styles.inviteCode}>{inviteCode}</Text>
 
             <View style={styles.inviteActions}>
-              <Button title="Copy Code" onPress={handleCopyInviteCode} variant="secondary" />
-              <Button title="Copy Link" onPress={handleCopyInviteLink} variant="secondary" />
+              <View style={styles.inviteActionButton}>
+                <Button title="Copy Code" onPress={handleCopyInviteCode} variant="secondary" />
+              </View>
+              <View style={styles.inviteActionButton}>
+                <Button title="Copy Link" onPress={handleCopyInviteLink} variant="secondary" />
+              </View>
             </View>
 
             {canManageGroup ? (
@@ -321,7 +392,7 @@ export default function GroupSettingsScreen() {
                 <Text style={styles.regenerateText}>Regenerate code</Text>
               </Pressable>
             ) : (
-              <Text style={styles.helperText}>Only admins and owners can manage invite codes.</Text>
+              <Text style={styles.helperText}>Only owners and admins can manage invite codes.</Text>
             )}
           </View>
         </SettingsSection>
@@ -418,8 +489,11 @@ const styles = StyleSheet.create({
     width: 24,
   },
   content: {
-    padding: Spacing.md,
+    padding: Spacing.lg,
     gap: Spacing.lg,
+  },
+  scrollView: {
+    flex: 1,
   },
   loadingState: {
     flex: 1,
@@ -459,7 +533,7 @@ const styles = StyleSheet.create({
   },
   memberRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     gap: Spacing.sm,
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.sm,
@@ -485,6 +559,21 @@ const styles = StyleSheet.create({
   },
   removeChipText: {
     color: Colors.danger,
+    fontSize: Typography.sizes.sm,
+    fontWeight: Typography.weights.medium,
+  },
+  memberActions: {
+    alignItems: 'flex-end',
+    gap: Spacing.xs,
+  },
+  memberActionChip: {
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.xs,
+    borderRadius: BorderRadius.pill,
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+  },
+  memberActionText: {
+    color: Colors.primary,
     fontSize: Typography.sizes.sm,
     fontWeight: Typography.weights.medium,
   },
@@ -538,6 +627,9 @@ const styles = StyleSheet.create({
   inviteActions: {
     flexDirection: 'row',
     gap: Spacing.sm,
+  },
+  inviteActionButton: {
+    flex: 1,
   },
   regenerateButton: {
     flexDirection: 'row',
