@@ -1,10 +1,9 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable, RefreshControl, ActivityIndicator } from 'react-native';
 import { Image } from 'expo-image';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { useAlert } from '@/template';
 import { Colors, Typography, BorderRadius, Spacing } from '@/constants/theme';
 import { Button, UserAvatar, UserName } from '@/components';
 import { useGroups } from '@/hooks/useGroups';
@@ -20,8 +19,8 @@ const supabase = getSupabaseClient();
 export default function GroupDetailScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { id } = useLocalSearchParams<{ id: string }>();
-  const { showAlert } = useAlert();
+  const { id } = useLocalSearchParams<{ id: string | string[] }>();
+  const groupId = Array.isArray(id) ? id[0] : id;
   const groupsHook = useGroups();
   const matchesHook = useMatches();
 
@@ -46,59 +45,59 @@ export default function GroupDetailScreen() {
     loadUserId();
   }, []);
 
-  useEffect(() => {
-    if (userId && id) {
-      loadGroupData();
-    }
-  }, [userId, id]);
-
-  useEffect(() => {
-    if (id) {
-      loadLeaderboard();
-    }
-  }, [id, selectedSport, leaderboardPeriod]);
-
   const loadUserId = async () => {
     const { data: { user } } = await supabase.auth.getUser();
     setUserId(user?.id || null);
   };
 
-  const loadGroupData = async () => {
-    if (!id) return;
+  const loadGroupData = useCallback(async () => {
+    if (!groupId) return;
 
     setIsInitialLoading(true);
     try {
-      const groupData = await groupsHook.getGroupById(id);
+      const groupData = await groupsHook.getGroupById(groupId);
       setGroup(groupData);
 
-      const membersData = await groupsHook.getGroupMembers(id);
+      const membersData = await groupsHook.getGroupMembers(groupId);
       setMembers(membersData);
 
-      const matchesData = await matchesHook.getGroupMatches(id, 50); // Load more for filtering
+      const matchesData = await matchesHook.getGroupMatches(groupId, 50); // Load more for filtering
       setMatches(matchesData);
 
       // Load group tournaments
       const { data: tournamentsData } = await supabase
         .from('tournaments')
         .select('*')
-        .eq('group_id', id)
+        .eq('group_id', groupId)
         .is('deleted_at', null)
         .order('created_at', { ascending: false });
       setTournaments(tournamentsData || []);
     } finally {
       setIsInitialLoading(false);
     }
-  };
+  }, [groupId, groupsHook, matchesHook]);
 
-  const loadLeaderboard = async () => {
-    if (!id) return;
+  const loadLeaderboard = useCallback(async () => {
+    if (!groupId) return;
     try {
-      const data = await matchesService.getLeaderboard(id, selectedSport, leaderboardPeriod);
+      const data = await matchesService.getLeaderboard(groupId, selectedSport, leaderboardPeriod);
       setLeaderboard(data.slice(0, 5)); // Top 5
     } catch (err) {
       console.error('Error loading leaderboard:', err);
     }
-  };
+  }, [groupId, leaderboardPeriod, selectedSport]);
+
+  useEffect(() => {
+    if (userId && groupId) {
+      loadGroupData();
+    }
+  }, [groupId, loadGroupData, userId]);
+
+  useEffect(() => {
+    if (groupId) {
+      loadLeaderboard();
+    }
+  }, [groupId, loadLeaderboard]);
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -177,7 +176,7 @@ export default function GroupDetailScreen() {
     return filtered;
   }, [tournaments, tournamentFilter, tournamentSort]);
 
-  if (!userId || !id) {
+  if (!userId || !groupId) {
     return (
       <View style={[styles.container, { paddingTop: insets.top }]}>
         <Text style={styles.loadingText}>Loading...</Text>
@@ -200,7 +199,7 @@ export default function GroupDetailScreen() {
               transition={200}
             />
           </Pressable>
-          <Pressable onPress={() => router.push(`/group-settings/${id}`)}>
+          <Pressable onPress={() => router.push(`/group-settings/${groupId}`)}>
             <MaterialIcons name="more-vert" size={24} color={Colors.textPrimary} />
           </Pressable>
         </View>
@@ -230,7 +229,7 @@ export default function GroupDetailScreen() {
               transition={200}
             />
           </Pressable>
-          <Pressable onPress={() => router.push(`/group-settings/${id}`)}>
+          <Pressable onPress={() => router.push(`/group-settings/${groupId}`)}>
             <MaterialIcons name="more-vert" size={24} color={Colors.textPrimary} />
           </Pressable>
         </View>
@@ -242,8 +241,6 @@ export default function GroupDetailScreen() {
       </View>
     );
   }
-
-  const isOwner = group.ownerId === userId;
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -260,7 +257,7 @@ export default function GroupDetailScreen() {
           />
         </Pressable>
         <Text style={styles.headerTitle}>{group.name}</Text>
-        <Pressable onPress={() => router.push(`/group-settings/${id}`)}>
+        <Pressable onPress={() => router.push(`/group-settings/${groupId}`)}>
           <MaterialIcons name="more-vert" size={24} color={Colors.textPrimary} />
         </Pressable>
       </View>

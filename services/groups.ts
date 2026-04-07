@@ -2,6 +2,7 @@ import { getSupabaseClient } from '@/template';
 import { Sport } from '@/constants/config';
 
 const supabase = getSupabaseClient();
+const buildDefaultInviteCode = (groupId: string) => groupId.replace(/-/g, '').slice(0, 8).toUpperCase();
 
 export const groupsService = {
   async createGroup(data: {
@@ -88,6 +89,7 @@ export const groupsService = {
       name: data.name,
       sportFocus: data.sport_focus,
       ownerId: data.owner_id,
+      inviteCode: data.invite_code || buildDefaultInviteCode(data.id),
       memberCount: count || 0,
       createdAt: data.created_at,
     };
@@ -121,6 +123,49 @@ export const groupsService = {
     const { error } = await supabase
       .from('groups')
       .update({ name })
+      .eq('id', groupId);
+
+    if (error) throw error;
+  },
+
+  async updateMemberRole(memberId: string, role: 'admin' | 'member') {
+    const { error } = await supabase
+      .from('group_members')
+      .update({ role })
+      .eq('id', memberId);
+
+    if (error) throw error;
+  },
+
+  async transferOwnership(groupId: string, nextOwnerUserId: string, currentOwnerUserId: string) {
+    const { error: ownerUpdateError } = await supabase
+      .from('groups')
+      .update({ owner_id: nextOwnerUserId })
+      .eq('id', groupId);
+
+    if (ownerUpdateError) throw ownerUpdateError;
+
+    const { error: promoteError } = await supabase
+      .from('group_members')
+      .update({ role: 'owner' })
+      .eq('group_id', groupId)
+      .eq('user_id', nextOwnerUserId);
+
+    if (promoteError) throw promoteError;
+
+    const { error: demoteError } = await supabase
+      .from('group_members')
+      .update({ role: 'admin' })
+      .eq('group_id', groupId)
+      .eq('user_id', currentOwnerUserId);
+
+    if (demoteError) throw demoteError;
+  },
+
+  async updateInviteCode(groupId: string, inviteCode: string) {
+    const { error } = await supabase
+      .from('groups')
+      .update({ invite_code: inviteCode })
       .eq('id', groupId);
 
     if (error) throw error;
