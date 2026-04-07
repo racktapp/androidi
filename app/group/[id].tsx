@@ -20,7 +20,8 @@ const supabase = getSupabaseClient();
 export default function GroupDetailScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id } = useLocalSearchParams<{ id: string | string[] }>();
+  const groupId = Array.isArray(id) ? id[0] : id;
   const { showAlert } = useAlert();
   const groupsHook = useGroups();
   const matchesHook = useMatches();
@@ -47,16 +48,16 @@ export default function GroupDetailScreen() {
   }, []);
 
   useEffect(() => {
-    if (userId && id) {
+    if (userId && groupId) {
       loadGroupData();
     }
-  }, [userId, id]);
+  }, [userId, groupId]);
 
   useEffect(() => {
-    if (id) {
+    if (groupId) {
       loadLeaderboard();
     }
-  }, [id, selectedSport, leaderboardPeriod]);
+  }, [groupId, selectedSport, leaderboardPeriod]);
 
   const loadUserId = async () => {
     const { data: { user } } = await supabase.auth.getUser();
@@ -64,24 +65,24 @@ export default function GroupDetailScreen() {
   };
 
   const loadGroupData = async () => {
-    if (!id) return;
+    if (!groupId) return;
 
     setIsInitialLoading(true);
     try {
-      const groupData = await groupsHook.getGroupById(id);
+      const groupData = await groupsHook.getGroupById(groupId);
       setGroup(groupData);
 
-      const membersData = await groupsHook.getGroupMembers(id);
+      const membersData = await groupsHook.getGroupMembers(groupId);
       setMembers(membersData);
 
-      const matchesData = await matchesHook.getGroupMatches(id, 50); // Load more for filtering
+      const matchesData = await matchesHook.getGroupMatches(groupId, 50); // Load more for filtering
       setMatches(matchesData);
 
       // Load group tournaments
       const { data: tournamentsData } = await supabase
         .from('tournaments')
         .select('*')
-        .eq('group_id', id)
+        .eq('group_id', groupId)
         .is('deleted_at', null)
         .order('created_at', { ascending: false });
       setTournaments(tournamentsData || []);
@@ -91,9 +92,9 @@ export default function GroupDetailScreen() {
   };
 
   const loadLeaderboard = async () => {
-    if (!id) return;
+    if (!groupId) return;
     try {
-      const data = await matchesService.getLeaderboard(id, selectedSport, leaderboardPeriod);
+      const data = await matchesService.getLeaderboard(groupId, selectedSport, leaderboardPeriod);
       setLeaderboard(data.slice(0, 5)); // Top 5
     } catch (err) {
       console.error('Error loading leaderboard:', err);
@@ -177,7 +178,7 @@ export default function GroupDetailScreen() {
     return filtered;
   }, [tournaments, tournamentFilter, tournamentSort]);
 
-  if (!userId || !id) {
+  if (!userId || !groupId) {
     return (
       <View style={[styles.container, { paddingTop: insets.top }]}>
         <Text style={styles.loadingText}>Loading...</Text>
@@ -200,7 +201,7 @@ export default function GroupDetailScreen() {
               transition={200}
             />
           </Pressable>
-          <Pressable onPress={() => router.push(`/group-settings/${id}`)}>
+          <Pressable onPress={() => router.push(`/group-settings/${groupId}`)}>
             <MaterialIcons name="more-vert" size={24} color={Colors.textPrimary} />
           </Pressable>
         </View>
@@ -230,7 +231,7 @@ export default function GroupDetailScreen() {
               transition={200}
             />
           </Pressable>
-          <Pressable onPress={() => router.push(`/group-settings/${id}`)}>
+          <Pressable onPress={() => router.push(`/group-settings/${groupId}`)}>
             <MaterialIcons name="more-vert" size={24} color={Colors.textPrimary} />
           </Pressable>
         </View>
@@ -260,7 +261,7 @@ export default function GroupDetailScreen() {
           />
         </Pressable>
         <Text style={styles.headerTitle}>{group.name}</Text>
-        <Pressable onPress={() => router.push(`/group-settings/${id}`)}>
+        <Pressable onPress={() => router.push(`/group-settings/${groupId}`)}>
           <MaterialIcons name="more-vert" size={24} color={Colors.textPrimary} />
         </Pressable>
       </View>

@@ -20,7 +20,8 @@ type ConfirmAction = 'leave' | 'delete' | 'remove-member' | null;
 export default function GroupSettingsScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id } = useLocalSearchParams<{ id: string | string[] }>();
+  const groupId = Array.isArray(id) ? id[0] : id;
   const { showAlert } = useAlert();
   const groupsHook = useGroups();
   const friendsHook = useFriends();
@@ -42,7 +43,7 @@ export default function GroupSettingsScreen() {
   };
 
   const loadData = useCallback(async () => {
-    if (!id) return;
+    if (!groupId) return;
 
     setLoading(true);
     try {
@@ -51,9 +52,13 @@ export default function GroupSettingsScreen() {
       setUserId(currentUserId);
 
       const [groupData, membersData] = await Promise.all([
-        groupsHook.getGroupById(id),
-        groupsHook.getGroupMembers(id),
+        groupsHook.getGroupById(groupId),
+        groupsHook.getGroupMembers(groupId),
       ]);
+
+      if (!groupData) {
+        throw new Error('Group not found');
+      }
 
       setGroup(groupData);
       setMembers(membersData);
@@ -70,7 +75,7 @@ export default function GroupSettingsScreen() {
     } finally {
       setLoading(false);
     }
-  }, [friendsHook, groupsHook, id, router, showAlert]);
+  }, [friendsHook, groupId, groupsHook, router, showAlert]);
 
   useEffect(() => {
     loadData();
@@ -89,19 +94,19 @@ export default function GroupSettingsScreen() {
   }, [friends, members]);
 
   const getInviteLink = () => {
-    if (!id) return '';
-    return `rackt://group/${id}?code=${inviteCode}`;
+    if (!groupId) return '';
+    return `rackt://group/${groupId}?code=${inviteCode}`;
   };
 
   const handleRenameGroup = async () => {
-    if (!id || !canManageGroup || !newGroupName.trim()) return;
+    if (!groupId || !canManageGroup || !newGroupName.trim()) return;
 
     const trimmed = newGroupName.trim();
     if (trimmed === group?.name) return;
 
     setSaving(true);
     try {
-      await groupsHook.renameGroup(id, trimmed);
+      await groupsHook.renameGroup(groupId, trimmed);
       setGroup((prev: any) => (prev ? { ...prev, name: trimmed } : prev));
       showAlert('Success', 'Group renamed successfully');
     } catch (err: any) {
@@ -112,10 +117,10 @@ export default function GroupSettingsScreen() {
   };
 
   const handleAddFriend = async (friendId: string) => {
-    if (!id || !canManageGroup) return;
+    if (!groupId || !canManageGroup) return;
 
     try {
-      await groupsHook.addMember(id, friendId);
+      await groupsHook.addMember(groupId, friendId);
       showAlert('Success', 'Member added');
       await loadData();
     } catch (err: any) {
@@ -161,10 +166,10 @@ export default function GroupSettingsScreen() {
   };
 
   const confirmLeaveGroup = async () => {
-    if (!id || !userId) return;
+    if (!groupId || !userId) return;
 
     try {
-      await groupsHook.leaveGroup(id, userId);
+      await groupsHook.leaveGroup(groupId, userId);
       showAlert('Left Group', 'You are no longer a member of this group');
       router.replace('/(tabs)/dashboard');
     } catch (err: any) {
@@ -173,10 +178,10 @@ export default function GroupSettingsScreen() {
   };
 
   const confirmDeleteGroup = async () => {
-    if (!id || !canManageGroup) return;
+    if (!groupId || !canManageGroup) return;
 
     try {
-      await groupsHook.deleteGroup(id);
+      await groupsHook.deleteGroup(groupId);
       showAlert('Deleted', 'Group deleted successfully');
       router.replace('/(tabs)/dashboard');
     } catch (err: any) {
