@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable, RefreshControl, ActivityIndicator } from 'react-native';
 import { Image } from 'expo-image';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -10,7 +10,7 @@ import { useGroups } from '@/hooks/useGroups';
 import { useMatches } from '@/hooks/useMatches';
 import { Group, GroupMember, Match } from '@/types';
 import { Sport } from '@/constants/config';
-import { getSupabaseClient } from '@/template';
+import { getSupabaseClient, useAlert } from '@/template';
 import { matchesService } from '@/services/matches';
 import { getUserLabel } from '@/utils/getUserLabel';
 
@@ -20,7 +20,21 @@ export default function GroupDetailScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string | string[] }>();
-  const groupId = Array.isArray(id) ? id[0] : id;
+  const groupId = useMemo(() => {
+    if (Array.isArray(id)) {
+      const firstValidId = id.find((value): value is string => typeof value === 'string' && value.trim().length > 0);
+      return firstValidId?.trim();
+    }
+
+    if (typeof id === 'string' && id.trim().length > 0) {
+      return id.trim();
+    }
+
+    return undefined;
+  }, [id]);
+  const { showAlert } = useAlert();
+  const hasHandledMissingGroupId = useRef(false);
+  const hasHandledMissingGroupData = useRef(false);
   const groupsHook = useGroups();
   const matchesHook = useMatches();
 
@@ -56,6 +70,14 @@ export default function GroupDetailScreen() {
     setIsInitialLoading(true);
     try {
       const groupData = await groupsHook.getGroupById(groupId);
+      if (!groupData) {
+        if (!hasHandledMissingGroupData.current) {
+          hasHandledMissingGroupData.current = true;
+          showAlert('Group not found', 'This group could not be loaded.');
+          router.back();
+        }
+        return;
+      }
       setGroup(groupData);
 
       const membersData = await groupsHook.getGroupMembers(groupId);
@@ -75,7 +97,15 @@ export default function GroupDetailScreen() {
     } finally {
       setIsInitialLoading(false);
     }
-  }, [groupId, groupsHook, matchesHook]);
+  }, [groupId, groupsHook, matchesHook, router, showAlert]);
+
+  useEffect(() => {
+    if (!groupId && !hasHandledMissingGroupId.current) {
+      hasHandledMissingGroupId.current = true;
+      showAlert('Invalid group link', 'Unable to open this group because the link is missing an id.');
+      router.back();
+    }
+  }, [groupId, router, showAlert]);
 
   const loadLeaderboard = useCallback(async () => {
     if (!groupId) return;
@@ -199,7 +229,7 @@ export default function GroupDetailScreen() {
               transition={200}
             />
           </Pressable>
-          <Pressable onPress={() => router.push(`/group-settings/${groupId}`)}>
+          <Pressable onPress={() => groupId && router.push({ pathname: '/group-settings/[id]', params: { id: groupId } })}>
             <MaterialIcons name="more-vert" size={24} color={Colors.textPrimary} />
           </Pressable>
         </View>
@@ -229,7 +259,7 @@ export default function GroupDetailScreen() {
               transition={200}
             />
           </Pressable>
-          <Pressable onPress={() => router.push(`/group-settings/${groupId}`)}>
+          <Pressable onPress={() => groupId && router.push({ pathname: '/group-settings/[id]', params: { id: groupId } })}>
             <MaterialIcons name="more-vert" size={24} color={Colors.textPrimary} />
           </Pressable>
         </View>
@@ -257,7 +287,7 @@ export default function GroupDetailScreen() {
           />
         </Pressable>
         <Text style={styles.headerTitle}>{group.name}</Text>
-        <Pressable onPress={() => router.push(`/group-settings/${groupId}`)}>
+        <Pressable onPress={() => groupId && router.push({ pathname: '/group-settings/[id]', params: { id: groupId } })}>
           <MaterialIcons name="more-vert" size={24} color={Colors.textPrimary} />
         </Pressable>
       </View>

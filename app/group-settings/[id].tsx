@@ -21,7 +21,18 @@ export default function GroupSettingsScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string | string[] }>();
-  const groupId = Array.isArray(id) ? id[0] : id;
+  const groupId = useMemo(() => {
+    if (Array.isArray(id)) {
+      const firstValidId = id.find((value): value is string => typeof value === 'string' && value.trim().length > 0);
+      return firstValidId?.trim();
+    }
+
+    if (typeof id === 'string' && id.trim().length > 0) {
+      return id.trim();
+    }
+
+    return undefined;
+  }, [id]);
   const { showAlert } = useAlert();
   const groupsHook = useGroups();
   const friendsHook = useFriends();
@@ -43,7 +54,12 @@ export default function GroupSettingsScreen() {
   const buildInviteCode = (value: string) => value.replace(/-/g, '').slice(0, 8).toUpperCase();
 
   const loadData = useCallback(async () => {
-    if (!groupId) return;
+    if (!groupId) {
+      setLoading(false);
+      showAlert('Invalid group link', 'Unable to open settings because the group id is missing.');
+      router.back();
+      return;
+    }
 
     setLoading(true);
     try {
