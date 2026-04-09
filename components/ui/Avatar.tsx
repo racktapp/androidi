@@ -37,7 +37,7 @@ export function Avatar({ imageUrl, initials = 'RA', size = 'md', style }: Avatar
           styles.image,
           { width: dimension, height: dimension, borderRadius: dimension / 2 },
           style,
-        ]}
+        ] as any}
         contentFit="cover"
         transition={200}
       />

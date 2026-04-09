@@ -16,6 +16,15 @@ import { getUserLabel } from '@/utils/getUserLabel';
 const supabase = getSupabaseClient();
 
 type ConfirmAction = 'leave' | 'delete' | 'remove-member' | null;
+type MemberRole = 'owner' | 'admin' | 'member';
+
+const normalizeMemberRole = (role: unknown): MemberRole => {
+  if (role === 'owner' || role === 'admin' || role === 'member') {
+    return role;
+  }
+
+  return 'member';
+};
 
 export default function GroupSettingsScreen() {
   const insets = useSafeAreaInsets();
@@ -98,7 +107,7 @@ export default function GroupSettingsScreen() {
   }, [loadData]);
 
   const currentMember = members.find(member => member.userId === userId);
-  const currentRole = (currentMember?.role || 'member') as 'owner' | 'admin' | 'member';
+  const currentRole = normalizeMemberRole(currentMember?.role);
   const canManageGroup = currentRole === 'owner' || currentRole === 'admin';
   const isOwner = currentRole === 'owner';
 
@@ -304,10 +313,12 @@ export default function GroupSettingsScreen() {
         <SettingsSection title="Members">
           {members.map(member => {
             const label = getUserLabel(member.user);
+            const role = normalizeMemberRole(member.role);
             const isCurrentUser = member.userId === userId;
+            const memberKey = member.id || `${member.userId}-${member.joinedAt || 'member'}`;
 
             return (
-              <View key={member.id} style={styles.memberRow}>
+              <View key={memberKey} style={styles.memberRow}>
                 <UserAvatar
                   name={label.displayName}
                   avatarUrl={member.user?.avatarUrl}
@@ -316,7 +327,7 @@ export default function GroupSettingsScreen() {
                 <View style={styles.memberInfo}>
                   <Text style={styles.memberName}>{label.displayName}</Text>
                   <Text style={styles.memberMeta}>
-                    {member.role.toUpperCase()}
+                    {role.toUpperCase()}
                     {isCurrentUser ? ' · You' : ''}
                   </Text>
                 </View>
@@ -326,12 +337,12 @@ export default function GroupSettingsScreen() {
                     {isOwner && (
                       <>
                         <Pressable
-                          onPress={() => handleUpdateMemberRole(member, member.role === 'admin' ? 'member' : 'admin')}
+                          onPress={() => handleUpdateMemberRole(member, role === 'admin' ? 'member' : 'admin')}
                           style={styles.memberActionChip}
                           disabled={isUpdatingRoles}
                         >
                           <Text style={styles.memberActionText}>
-                            {member.role === 'admin' ? 'Remove admin' : 'Make admin'}
+                            {role === 'admin' ? 'Remove admin' : 'Make admin'}
                           </Text>
                         </Pressable>
                         <Pressable
@@ -570,7 +581,7 @@ const styles = StyleSheet.create({
   removeChip: {
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.xs,
-    borderRadius: BorderRadius.pill,
+    borderRadius: BorderRadius.full,
     backgroundColor: 'rgba(255, 255, 255, 0.06)',
   },
   removeChipText: {
@@ -585,7 +596,7 @@ const styles = StyleSheet.create({
   memberActionChip: {
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.xs,
-    borderRadius: BorderRadius.pill,
+    borderRadius: BorderRadius.full,
     backgroundColor: 'rgba(255, 255, 255, 0.06)',
   },
   memberActionText: {
@@ -712,10 +723,10 @@ const styles = StyleSheet.create({
     fontWeight: Typography.weights.bold,
   },
   modalMessage: {
-    color: Colors.textSecondary,
+    color: Colors.textMuted,
     textAlign: 'center',
     fontSize: Typography.sizes.sm,
-    lineHeight: Typography.lineHeights.relaxed * Typography.sizes.sm,
+    lineHeight: Typography.sizes.sm * 1.5,
   },
   modalActions: {
     flexDirection: 'row',

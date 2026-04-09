@@ -127,7 +127,7 @@ export const tournamentsService = {
 
     if (error) throw error;
 
-    const tournaments = (data || []).map(this.mapTournament);
+    const tournaments = ((data || []) as any[]).map((row) => this.mapTournament(row));
     
     const active = tournaments.filter(t => 
       t.state === 'draft' || t.state === 'inviting' || t.state === 'locked' || t.state === 'in_progress'
@@ -215,8 +215,8 @@ export const tournamentsService = {
 
     // Filter out invites for deleted tournaments
     // Supabase join doesn't respect deleted_at filter, so we filter client-side
-    const invites = (data || [])
-      .filter(raw => {
+    const invites = ((data || []) as any[])
+      .filter((raw: any) => {
         // Exclude invites where tournament is deleted
         if (raw.tournament && raw.tournament.deleted_at) {
           console.log(`[getPendingInvites] Filtering out invite for deleted tournament: ${raw.tournament.title}`);
@@ -229,7 +229,7 @@ export const tournamentsService = {
         }
         return true;
       })
-      .map(raw => ({
+      .map((raw: any) => ({
         ...this.mapInvite(raw),
         tournament: raw.tournament ? this.mapTournament(raw.tournament) : undefined,
       }));

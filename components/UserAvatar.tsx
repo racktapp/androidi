@@ -67,7 +67,7 @@ export function UserAvatar({
     return (
       <Image
         source={{ uri: displayUrl }}
-        style={[containerStyle, styles.image]}
+        style={[containerStyle, styles.image] as any}
         contentFit="cover"
         transition={200}
         onError={() => {
