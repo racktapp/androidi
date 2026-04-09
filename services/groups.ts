@@ -100,6 +100,7 @@ export const groupsService = {
       .from('group_members')
       .select(`
         id,
+        user_id,
         role,
         joined_at,
         user:user_id (id, username, display_name, email, initials, avatar_url)
@@ -109,14 +110,21 @@ export const groupsService = {
 
     if (error) throw error;
 
-    return (data || []).map((item: any) => ({
-      id: item.id,
-      groupId,
-      userId: item.user.id,
-      role: item.role,
-      joinedAt: item.joined_at,
-      user: item.user,
-    }));
+    return (data || []).map((item: any) => {
+      const safeUserId = item.user?.id || item.user_id;
+      const normalizedRole = item.role === 'owner' || item.role === 'admin' || item.role === 'member'
+        ? item.role
+        : 'member';
+
+      return {
+        id: item.id,
+        groupId,
+        userId: safeUserId,
+        role: normalizedRole,
+        joinedAt: item.joined_at,
+        user: item.user || null,
+      };
+    });
   },
 
   async renameGroup(groupId: string, name: string) {
