@@ -1,36 +1,44 @@
+import { useCallback, useMemo } from 'react';
 import { friendsService } from '@/services/friends';
 
 export function useFriends() {
-  const searchUsers = async (query: string) => {
+  const searchUsers = useCallback(async (query: string) => {
     return await friendsService.searchUsers(query);
-  };
+  }, []);
 
-  const sendFriendRequest = async (senderId: string, receiverId: string) => {
+  const sendFriendRequest = useCallback(async (senderId: string, receiverId: string) => {
     await friendsService.sendFriendRequest(receiverId);
-  };
+  }, []);
 
-  const respondToRequest = async (requestId: string, userId: string, accept: boolean) => {
+  const respondToRequest = useCallback(async (requestId: string, userId: string, accept: boolean) => {
     await friendsService.respondToRequest(requestId, accept);
-  };
+  }, []);
 
-  const getIncomingRequests = async (userId: string) => {
+  const getIncomingRequests = useCallback(async (userId: string) => {
     return await friendsService.getIncomingRequests(userId);
-  };
+  }, []);
 
-  const getOutgoingRequests = async (userId: string) => {
+  const getOutgoingRequests = useCallback(async (userId: string) => {
     return await friendsService.getOutgoingRequests(userId);
-  };
+  }, []);
 
-  const getFriends = async (userId: string) => {
+  const getFriends = useCallback(async (userId: string) => {
     return await friendsService.getFriends(userId);
-  };
+  }, []);
 
-  return {
+  return useMemo(() => ({
     searchUsers,
     sendFriendRequest,
     respondToRequest,
     getIncomingRequests,
     getOutgoingRequests,
     getFriends,
-  };
+  }), [
+    getFriends,
+    getIncomingRequests,
+    getOutgoingRequests,
+    respondToRequest,
+    searchUsers,
+    sendFriendRequest,
+  ]);
 }
